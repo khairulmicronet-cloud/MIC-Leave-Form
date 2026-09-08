@@ -1,15 +1,13 @@
 // ---------------------------------------------------------------------
 // EDIT THIS FILE to match your real submission details.
-// I don't have your colleagues' actual email addresses, so these are
-// placeholders — replace them before you deploy.
 // ---------------------------------------------------------------------
 const LEAVE_FORM_CONFIG = {
   applicantDisplayName: "Awangku Muhammad Khairul Amir Pengiran Darma Putra",
   applicantTitle: "Lecturer",
 
   // Recipients for the submission email (comma-separate multiple addresses)
-  emailTo: "maziyyah@micronet.com.bn",          // <-- replace with her real address
-  emailCc: "sharon@micronet.com.bn, hajahnuraqilah@micronet.com.bn", // <-- replace
+  emailTo: "maziyyah@micronetbrunei.com",
+  emailCc: "sharon@micronetbrunei.com, aqilah@micronetbrunei.com",
 
   emailGreetingName: "Ms. Maziyyah",
 
