@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#3a5a8c">
+<title>Micronet Leave Application Form</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="page">
+
+  <header class="form-header">
+    <img src="assets/micronet-logo.png" alt="Micronet International College" class="logo">
+    <h1>LEAVE APPLICATION FORM</h1>
+  </header>
+
+  <form id="leaveForm" class="form-box" novalidate>
+
+    <div class="row">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" required autocomplete="name">
+    </div>
+
+    <fieldset class="row-group">
+      <legend>Leave Start</legend>
+      <div class="inline-fields">
+        <span class="sub-label">Date:</span>
+        <input type="date" id="startDate" name="startDate" required>
+        <span class="sub-label">Day:</span>
+        <input type="text" id="startDay" name="startDay" readonly tabindex="-1">
+        <span class="sub-label">Time:</span>
+        <input type="time" id="startTime" name="startTime" required>
+      </div>
+    </fieldset>
+
+    <fieldset class="row-group">
+      <legend>Leave End</legend>
+      <div class="inline-fields">
+        <span class="sub-label">Date:</span>
+        <input type="date" id="endDate" name="endDate" required>
+        <span class="sub-label">Day:</span>
+        <input type="text" id="endDay" name="endDay" readonly tabindex="-1">
+        <span class="sub-label">Time:</span>
+        <input type="time" id="endTime" name="endTime" required>
+      </div>
+    </fieldset>
+
+    <fieldset class="row-group">
+      <legend>Resume Duty On</legend>
+      <div class="inline-fields">
+        <span class="sub-label">Date:</span>
+        <input type="date" id="resumeDate" name="resumeDate" required>
+        <span class="sub-label">Day:</span>
+        <input type="text" id="resumeDay" name="resumeDay" readonly tabindex="-1">
+        <span class="sub-label">Time:</span>
+        <input type="time" id="resumeTime" name="resumeTime" required>
+      </div>
+    </fieldset>
+
+    <div class="row">
+      <label for="daysApplied">No. Of Days Applied For</label>
+      <input type="number" id="daysApplied" name="daysApplied" min="0" step="0.5" required>
+    </div>
+
+    <div class="row tall">
+      <label for="reason">Reason For Applying Leave</label>
+      <textarea id="reason" name="reason" rows="2" required></textarea>
+    </div>
+
+    <div class="row tall">
+      <label for="address">Address While On Leave</label>
+      <textarea id="address" name="address" rows="2" required></textarea>
+    </div>
+
+    <div class="row">
+      <label for="telephone">Telephone While On Leave</label>
+      <div class="phone-field">
+        <span class="prefix">+673</span>
+        <input type="tel" id="telephone" name="telephone" required inputmode="numeric" placeholder="7250492">
+      </div>
+    </div>
+
+    <div class="row signature-row">
+      <label for="signature">Signature <span class="hint">(type full name)</span></label>
+      <input type="text" id="signature" name="signature" required>
+    </div>
+
+    <div class="row">
+      <label for="sigDate">Date</label>
+      <input type="date" id="sigDate" name="sigDate" required>
+    </div>
+
+    <hr class="section-divider">
+
+    <h2 class="admin-heading">To Be Completed by Administration Department</h2>
+    <p class="admin-note">
+      The section below is completed by the Administration Department after submission and is
+      reproduced here for reference only &mdash; it is left blank in your exported document.
+    </p>
+
+    <div class="admin-preview">
+      <div class="admin-row"><strong>Type of Leave</strong> &nbsp; Annual &nbsp;○&nbsp; Sick &nbsp;○&nbsp; Advance &nbsp;○&nbsp; Unpaid &nbsp;○</div>
+      <div class="admin-row"><strong>Leave Available</strong> ________________________________________</div>
+      <div class="admin-row"><strong>Leave Remain</strong> ________________________________________</div>
+      <div class="admin-row"><strong>Administrator</strong> &nbsp; ...................... &nbsp;&nbsp; <strong>Date</strong> ......................</div>
+      <div class="admin-row"><strong>General Manager</strong> &nbsp; <em>Approved / Not Approved</em> &nbsp;&nbsp; <strong>Date</strong> ......................</div>
+      <div class="admin-row"><strong>Executive Director</strong> &nbsp; <em>Approved / Not Approved</em> &nbsp;&nbsp; <strong>Date</strong> ......................</div>
+      <div class="admin-row"><strong>Managing Director</strong> &nbsp; <em>Approved / Not Approved</em> &nbsp;&nbsp; <strong>Date</strong> ......................</div>
+    </div>
+
+    <div class="button-row">
+      <button type="button" id="downloadBtn" class="btn primary">⬇ Download Filled Form (.docx)</button>
+      <button type="button" id="emailBtn" class="btn secondary">✉ Prepare Submission Email</button>
+    </div>
+
+    <p id="statusMsg" class="status-msg" role="status" aria-live="polite"></p>
+
+  </form>
+
+  <footer class="app-footer">
+    Micronet International College &middot; Leave Application &middot; works offline once installed
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
