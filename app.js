@@ -276,10 +276,27 @@
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
+  // Match the typed Name field against the known staff roster (config.js) so the
+  // exported filename uses a recognisable short name (e.g. "Khairul", not the
+  // last word of the full name, which is often a family/title component).
+  function resolveShortName(fullName) {
+    const typed = (fullName || "").trim();
+    const lowerTyped = typed.toLowerCase();
+    const roster = (typeof LEAVE_FORM_STAFF_NAMES !== "undefined" && Array.isArray(LEAVE_FORM_STAFF_NAMES))
+      ? LEAVE_FORM_STAFF_NAMES : [];
+    for (const candidate of roster) {
+      if (candidate && lowerTyped.indexOf(candidate.toLowerCase()) !== -1) {
+        return candidate;
+      }
+    }
+    const parts = typed.split(/\s+/).filter(Boolean);
+    return parts[parts.length - 1] || "Leave";
+  }
+
   function buildFilename(data) {
     const startFormatted = formatDateDDMMYYYY(data.startDate);
     const endFormatted = formatDateDDMMYYYY(data.endDate);
-    const shortName = (LEAVE_FORM_CONFIG.applicantDisplayName || "").split(" ").pop() || "Leave";
+    const shortName = resolveShortName(data.name);
     return `Leave Form (${startFormatted} to ${endFormatted}) - ${shortName}.docx`;
   }
 

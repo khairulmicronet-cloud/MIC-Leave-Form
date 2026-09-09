@@ -25,3 +25,21 @@ const LEAVE_FORM_CONFIG = {
     "E: khairul@micronet.com.bn    www.micronet.com.bn"
   ].join("\n")
 };
+
+// ---------------------------------------------------------------------
+// Known staff first names, used to pick the short name in the exported
+// filename: "Leave Form (start to end) - <ShortName>.docx". Whatever the
+// applicant types into the Name field is matched against this list
+// (case-insensitive, matches anywhere in the typed name); the first match
+// is used. Add a new staff member's first name here as they start using
+// the form. If nobody matches, the last word of the typed name is used
+// instead.
+// ---------------------------------------------------------------------
+const LEAVE_FORM_STAFF_NAMES = [
+  "Khairul",
+  "Amal",
+  "Nurlizam",
+  "Lyana",
+  "Veronica",
+  "Hariz"
+];
