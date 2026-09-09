@@ -147,6 +147,26 @@ body {
   background: transparent;
 }
 
+.upload-wrap {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.upload-wrap input[type="file"] {
+  flex: 1 1 200px;
+  font: inherit;
+}
+.upload-preview {
+  max-height: 50px;
+  max-width: 180px;
+  border: 1px solid #999;
+  background: #fff;
+  padding: 2px;
+  object-fit: contain;
+}
+
 .section-divider {
   border: none;
   border-top: 1.5px solid var(--border);

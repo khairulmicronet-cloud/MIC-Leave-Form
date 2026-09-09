@@ -1,4 +1,4 @@
-/* Micronet Leave Application — form logic, docx export, email handoff */
+/* Micronet Leave Application — form logic, docx export (from real template), and email handoff */
 (function () {
   "use strict";
 
@@ -6,6 +6,11 @@
   const statusEl = $("statusMsg");
 
   const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const TEMPLATE_URL = "assets/leave-form-template.docx";
+
+  // Signature / MC attachment state, populated by the file inputs below.
+  let signatureImage = null; // { buffer: ArrayBuffer, width, height, ext: "png"|"jpeg" }
+  let mcImage = null;        // same shape, or null if not attached
 
   function setStatus(msg, kind) {
     statusEl.textContent = msg;
@@ -52,11 +57,77 @@
     return `${h}.${String(min).padStart(2, "0")} ${suffix}`;
   }
 
+  function escapeXml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  }
+
+  // ---- Image file handling (signature + optional MC attachment) ----
+  function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function loadImageDimensions(objectUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = objectUrl;
+    });
+  }
+
+  function extFromMime(mime) {
+    return mime && mime.indexOf("png") !== -1 ? "png" : "jpeg";
+  }
+
+  function wireImageUpload(inputId, previewId, onLoaded, onCleared) {
+    const input = $(inputId);
+    const preview = $(previewId);
+    input.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) { onCleared(); preview.hidden = true; preview.src = ""; return; }
+      try {
+        const buffer = await readFileAsArrayBuffer(file);
+        const objectUrl = URL.createObjectURL(file);
+        const dims = await loadImageDimensions(objectUrl);
+        preview.src = objectUrl;
+        preview.hidden = false;
+        onLoaded({ buffer, width: dims.width, height: dims.height, ext: extFromMime(file.type) });
+      } catch (err) {
+        console.error(err);
+        setStatus("Could not read the selected image.", "error");
+        onCleared();
+        preview.hidden = true;
+      }
+    });
+  }
+
+  wireImageUpload("signature", "signaturePreview",
+    (img) => { signatureImage = img; },
+    () => { signatureImage = null; });
+
+  wireImageUpload("mcAttachment", "mcPreview",
+    (img) => { mcImage = img; },
+    () => { mcImage = null; });
+
   // ---- Collect + validate form data ----
   function collectFormData() {
     const form = $("leaveForm");
     if (!form.checkValidity()) {
       form.reportValidity();
+      return null;
+    }
+    if (!signatureImage) {
+      setStatus("Please upload a signature image.", "error");
       return null;
     }
     return {
@@ -74,165 +145,124 @@
       reason: $("reason").value.trim(),
       address: $("address").value.trim(),
       telephone: $("telephone").value.trim(),
-      signature: $("signature").value.trim(),
       sigDate: $("sigDate").value
     };
   }
 
-  // ---- DOCX generation (mirrors the Micronet Leave Application Form layout) ----
+  // ---- Build an <a:graphic> inline drawing run embedding a picture via relationship id ----
+  function inlineImageRunXml(relId, docPrId, cx, cy) {
+    return (
+      '<w:r><w:rPr><w:noProof/></w:rPr><w:drawing>' +
+      `<wp:inline distT="0" distB="0" distL="0" distR="0">` +
+      `<wp:extent cx="${cx}" cy="${cy}"/>` +
+      '<wp:effectExtent l="0" t="0" r="0" b="0"/>' +
+      `<wp:docPr id="${docPrId}" name="Image${docPrId}"/>` +
+      '<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>' +
+      '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+      '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      `<pic:nvPicPr><pic:cNvPr id="${docPrId}" name="Image${docPrId}"/><pic:cNvPicPr/></pic:nvPicPr>` +
+      `<pic:blipFill><a:blip r:embed="${relId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+      `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
+      '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>'
+    );
+  }
+
+  function scaledEmuSize(srcWidth, srcHeight, maxWidthEmu, maxHeightEmu) {
+    const EMU_PER_PX = 9525; // 96 dpi
+    const scale = Math.min(maxWidthEmu / (srcWidth * EMU_PER_PX), maxHeightEmu / (srcHeight * EMU_PER_PX));
+    return {
+      cx: Math.round(srcWidth * EMU_PER_PX * scale),
+      cy: Math.round(srcHeight * EMU_PER_PX * scale)
+    };
+  }
+
+  // ---- DOCX generation: fill the real Micronet template (XML string replacement), never rebuild from scratch ----
   async function buildDocxBlob(data) {
-    const {
-      Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
-      BorderStyle, WidthType, AlignmentType, ShadingType, HeadingLevel, VerticalAlign, TabStopType
-    } = docx;
+    const templateResp = await fetch(TEMPLATE_URL);
+    if (!templateResp.ok) throw new Error("Could not load the leave form template.");
+    const templateBuf = await templateResp.arrayBuffer();
+    const zip = await JSZip.loadAsync(templateBuf);
 
-    const logoResp = await fetch("assets/micronet-logo.png");
-    const logoBuf = await logoResp.arrayBuffer();
+    let xml = await zip.file("word/document.xml").async("string");
 
-    const thinBottomBorder = {
-      bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" }
+    const textTokens = {
+      "{{NAME}}": escapeXml(data.name),
+      "{{START_DATE}}": escapeXml(formatDateLong(data.startDate)),
+      "{{START_DAY}}": escapeXml(data.startDay),
+      "{{START_TIME}}": escapeXml(formatTime12h(data.startTime)),
+      "{{END_DATE}}": escapeXml(formatDateLong(data.endDate)),
+      "{{END_DAY}}": escapeXml(data.endDay),
+      "{{END_TIME}}": escapeXml(formatTime12h(data.endTime)),
+      "{{RESUME_DATE}}": escapeXml(formatDateLong(data.resumeDate)),
+      "{{RESUME_DAY}}": escapeXml(data.resumeDay),
+      "{{RESUME_TIME}}": escapeXml(formatTime12h(data.resumeTime)),
+      "{{DAYS_APPLIED}}": escapeXml(data.daysApplied),
+      "{{REASON}}": escapeXml(data.reason),
+      "{{ADDRESS}}": escapeXml(data.address),
+      "{{PHONE}}": escapeXml(data.telephone),
+      "{{SIG_DATE}}": escapeXml(formatDateLong(data.sigDate))
     };
-    const boxBorder = {
-      top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-      bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-      left: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-      right: { style: BorderStyle.SINGLE, size: 4, color: "000000" }
-    };
-
-    function fieldRow(label, valueRuns) {
-      return new Paragraph({
-        border: thinBottomBorder,
-        spacing: { after: 120 },
-        tabStops: [{ type: TabStopType.LEFT, position: 2600 }],
-        children: [
-          new TextRun({ text: label, bold: true }),
-          new TextRun({ text: "\t" }),
-          ...valueRuns
-        ]
-      });
+    for (const [token, value] of Object.entries(textTokens)) {
+      if (xml.indexOf(token) === -1) throw new Error(`Template is missing expected placeholder ${token}`);
+      xml = xml.replace(token, value);
     }
 
-    function dateDayTimeRow(label, dateVal, dayVal, timeVal) {
-      return new Paragraph({
-        border: thinBottomBorder,
-        spacing: { after: 120 },
-        tabStops: [{ type: TabStopType.LEFT, position: 2600 }],
-        children: [
-          new TextRun({ text: label, bold: true }),
-          new TextRun({ text: "\t" }),
-          new TextRun({ text: "Date: ", bold: true }),
-          new TextRun({ text: formatDateLong(dateVal) + "   " }),
-          new TextRun({ text: "Day: ", bold: true }),
-          new TextRun({ text: dayVal + "   " }),
-          new TextRun({ text: "Time: ", bold: true }),
-          new TextRun({ text: formatTime12h(timeVal) })
-        ]
-      });
-    }
+    // ---- Signature image: embed as a relationship + inline drawing in place of the token run ----
+    const relsPath = "word/_rels/document.xml.rels";
+    let relsXml = await zip.file(relsPath).async("string");
+    const ctPath = "[Content_Types].xml";
+    let ctXml = await zip.file(ctPath).async("string");
 
-    const children = [];
-
-    // Header: logo + title
-    children.push(new Paragraph({
-      children: [new ImageRun({ data: logoBuf, type: "png", transformation: { width: 110, height: 98 } })]
-    }));
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 100, after: 300 },
-      children: [new TextRun({ text: "LEAVE APPLICATION FORM", bold: true, size: 28 })]
-    }));
-
-    // Applicant section
-    children.push(fieldRow("Name", [new TextRun({ text: data.name })]));
-    children.push(dateDayTimeRow("Leave Start", data.startDate, data.startDay, data.startTime));
-    children.push(dateDayTimeRow("Leave End", data.endDate, data.endDay, data.endTime));
-    children.push(dateDayTimeRow("Resume Duty On", data.resumeDate, data.resumeDay, data.resumeTime));
-    children.push(fieldRow("No. Of Days Applied For", [new TextRun({ text: String(data.daysApplied) })]));
-    children.push(fieldRow("Reason For Applying Leave", [new TextRun({ text: data.reason })]));
-    children.push(fieldRow("Address While On Leave", [new TextRun({ text: data.address })]));
-    children.push(fieldRow("Telephone While On Leave", [new TextRun({ text: "+673 " + data.telephone })]));
-    children.push(fieldRow("Signature", [new TextRun({ text: data.signature, italics: true })]));
-    children.push(fieldRow("Date", [new TextRun({ text: formatDateLong(data.sigDate) })]));
-
-    children.push(new Paragraph({ spacing: { before: 300, after: 200 }, border: { top: { style: BorderStyle.SINGLE, size: 4, color: "000000" } }, children: [] }));
-
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-      children: [new TextRun({ text: "To Be Completed by Administration Department", bold: true })]
-    }));
-
-    children.push(new Paragraph({
-      spacing: { after: 200 },
-      children: [
-        new TextRun({ text: "Type of Leave", bold: true }),
-        new TextRun({ text: "\t\tAnnual \u25CB    Sick \u25CB    Advance \u25CB    Unpaid \u25CB" })
-      ]
-    }));
-    children.push(new Paragraph({ spacing: { after: 200 },
-      children: [ new TextRun({ text: "Leave Available", bold: true }), new TextRun({ text: "\t\t________________________________________" }) ] }));
-    children.push(new Paragraph({ spacing: { after: 200 },
-      children: [ new TextRun({ text: "Leave Remain", bold: true }), new TextRun({ text: "\t\t________________________________________" }) ] }));
-
-    function signOffBlock(role, showApproval) {
-      children.push(new Paragraph({ spacing: { before: 200 },
-        children: [ new TextRun({ text: role, bold: true }), new TextRun({ text: "\t\t\tDate", bold: true }) ] }));
-      if (showApproval) {
-        children.push(new Paragraph({ children: [ new TextRun({ text: "Approved / Not Approved", bold: true }) ] }));
+    function ensureContentTypeDefault(ext, mime) {
+      const marker = `Extension="${ext}"`;
+      if (ctXml.indexOf(marker) === -1) {
+        ctXml = ctXml.replace("</Types>", `<Default Extension="${ext}" ContentType="${mime}"/></Types>`);
       }
-      children.push(new Paragraph({ spacing: { after: 200 },
-        children: [ new TextRun({ text: "…………………………………….\t……………………………………………………………………………………." }) ] }));
-    }
-    signOffBlock("Administrator", false);
-    signOffBlock("General Manager", true);
-    signOffBlock("Executive Director", true);
-    signOffBlock("Managing Director", true);
-
-    // Page 2: To Be Filled by MIC Admin
-    children.push(new Paragraph({ children: [], pageBreakBefore: true }));
-    children.push(new Paragraph({
-      children: [new ImageRun({ data: logoBuf, type: "png", transformation: { width: 90, height: 80 } })]
-    }));
-
-    const headerCell = new TableCell({
-      columnSpan: 3,
-      shading: { type: ShadingType.CLEAR, fill: "D9E2F3" },
-      verticalAlign: VerticalAlign.CENTER,
-      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "To Be Filled by MIC Admin", bold: true, size: 24 })] })]
-    });
-
-    function adminRow(leaveLabel, balanceText) {
-      return new TableRow({
-        children: [
-          new TableCell({ width: { size: 1129, type: WidthType.DXA }, children: [new Paragraph({ children: [] })] }),
-          new TableCell({ width: { size: 4111, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
-            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: leaveLabel })] })] }),
-          new TableCell({ width: { size: 4105, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
-            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: balanceText ? [new TextRun({ text: balanceText })] : [] })] })
-        ]
-      });
     }
 
-    const adminTable = new Table({
-      width: { size: 9345, type: WidthType.DXA },
-      columnWidths: [1129, 4111, 4105],
-      rows: [
-        new TableRow({ children: [headerCell] }),
-        adminRow("Annual Leave", "Balance Annual Leave as of: ___________________"),
-        adminRow("Sick Leave", ""),
-        adminRow("Unpaid Leave", ""),
-        adminRow("Hospitalized Leave", "")
-      ]
-    });
+    const sigExt = signatureImage.ext === "png" ? "png" : "jpeg";
+    ensureContentTypeDefault(sigExt, sigExt === "png" ? "image/png" : "image/jpeg");
+    zip.file(`word/media/signature.${sigExt}`, signatureImage.buffer);
+    relsXml = relsXml.replace(
+      "</Relationships>",
+      `<Relationship Id="rIdSignatureImg" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/signature.${sigExt}"/></Relationships>`
+    );
+    const sigSize = scaledEmuSize(signatureImage.width, signatureImage.height, 1500000, 230000);
+    const sigToken = '<w:r><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>{{SIGNATURE_IMAGE}}</w:t></w:r>';
+    if (xml.indexOf(sigToken) === -1) throw new Error("Template is missing the signature placeholder run.");
+    xml = xml.replace(sigToken, inlineImageRunXml("rIdSignatureImg", 900, sigSize.cx, sigSize.cy));
 
-    const finalDoc = new Document({
-      sections: [{
-        properties: { page: { size: { width: 11906, height: 16838 } } }, // A4
-        children: [...children, adminTable]
-      }]
-    });
+    // ---- Optional Medical Certificate attachment (page 2), only if the user attached one ----
+    const mcToken = "<w:r><w:t>{{MC_ATTACHMENT}}</w:t></w:r>";
+    if (xml.indexOf(mcToken) === -1) throw new Error("Template is missing the MC attachment placeholder.");
+    if (mcImage) {
+      const mcExt = mcImage.ext === "png" ? "png" : "jpeg";
+      ensureContentTypeDefault(mcExt, mcExt === "png" ? "image/png" : "image/jpeg");
+      zip.file(`word/media/mc-attachment.${mcExt}`, mcImage.buffer);
+      relsXml = relsXml.replace(
+        "</Relationships>",
+        `<Relationship Id="rIdMcImg" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/mc-attachment.${mcExt}"/></Relationships>`
+      );
+      const mcSize = scaledEmuSize(mcImage.width, mcImage.height, 5940000, 7000000);
+      const mcXml =
+        '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Medical Certificate / Supporting Document Attached:</w:t></w:r>' +
+        '<w:r><w:br/></w:r>' +
+        inlineImageRunXml("rIdMcImg", 901, mcSize.cx, mcSize.cy);
+      xml = xml.replace(mcToken, mcXml);
+    } else {
+      xml = xml.replace(mcToken, "");
+    }
 
-    return await Packer.toBlob(finalDoc);
+    zip.file("word/document.xml", xml);
+    zip.file(relsPath, relsXml);
+    zip.file(ctPath, ctXml);
+
+    return await zip.generateAsync({
+      type: "blob",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      compression: "DEFLATE"
+    });
   }
 
   function downloadBlob(blob, filename) {
@@ -247,10 +277,10 @@
   }
 
   function buildFilename(data) {
-    const startDD = data.startDate ? data.startDate.split("-")[2] : "";
+    const startFormatted = formatDateDDMMYYYY(data.startDate);
     const endFormatted = formatDateDDMMYYYY(data.endDate);
     const shortName = (LEAVE_FORM_CONFIG.applicantDisplayName || "").split(" ").pop() || "Leave";
-    return `Leave Form (${startDD} & ${endFormatted}) - ${shortName}.docx`;
+    return `Leave Form (${startFormatted} to ${endFormatted}) - ${shortName}.docx`;
   }
 
   async function handleDownload() {
@@ -284,10 +314,7 @@
     const filename = buildFilename(data);
     downloadBlob(blob, filename);
 
-    const startDD = data.startDate.split("-")[2];
-    const endFormatted = formatDateDDMMYYYY(data.endDate);
-    const shortName = (LEAVE_FORM_CONFIG.applicantDisplayName || "").split(" ").pop() || "";
-    const subject = `Leave Form (${startDD} & ${endFormatted}) - ${shortName}`;
+    const subject = filename.replace(/\.docx$/i, "");
 
     const bodyLines = [
       `Dear ${LEAVE_FORM_CONFIG.emailGreetingName},`,

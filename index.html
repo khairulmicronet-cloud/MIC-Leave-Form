@@ -86,13 +86,24 @@
     </div>
 
     <div class="row signature-row">
-      <label for="signature">Signature <span class="hint">(type full name)</span></label>
-      <input type="text" id="signature" name="signature" required>
+      <label for="signature">Signature <span class="hint">(upload image)</span></label>
+      <div class="upload-wrap">
+        <input type="file" id="signature" name="signature" accept="image/png, image/jpeg" required>
+        <img id="signaturePreview" class="upload-preview" alt="Signature preview" hidden>
+      </div>
     </div>
 
     <div class="row">
       <label for="sigDate">Date</label>
       <input type="date" id="sigDate" name="sigDate" required>
+    </div>
+
+    <div class="row">
+      <label for="mcAttachment">Medical Certificate <span class="hint">(optional, upload image)</span></label>
+      <div class="upload-wrap">
+        <input type="file" id="mcAttachment" name="mcAttachment" accept="image/png, image/jpeg">
+        <img id="mcPreview" class="upload-preview" alt="Medical certificate preview" hidden>
+      </div>
     </div>
 
     <hr class="section-divider">
@@ -127,7 +138,7 @@
   </footer>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

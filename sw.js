@@ -1,4 +1,4 @@
-const CACHE_NAME = "leave-form-cache-v1";
+const CACHE_NAME = "leave-form-cache-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,9 +7,10 @@ const ASSETS = [
   "./config.js",
   "./manifest.json",
   "./assets/micronet-logo.png",
+  "./assets/leave-form-template.docx",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"
+  "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
 ];
 
 self.addEventListener("install", (event) => {
