@@ -34,6 +34,9 @@ const LEAVE_FORM_CONFIG = {
 // is used. Add a new staff member's first name here as they start using
 // the form. If nobody matches, the last word of the typed name is used
 // instead.
+//
+// This same list also populates the staff dropdown on the Staff Leave
+// Breakdown page (leave-breakdown.html).
 // ---------------------------------------------------------------------
 const LEAVE_FORM_STAFF_NAMES = [
   "Khairul",
@@ -41,7 +44,20 @@ const LEAVE_FORM_STAFF_NAMES = [
   "Nurlizam",
   "Lyana",
   "Veronica",
-  "Hariz"
+  "Hariz",
+  "Aqilah",
+  "Norain",
+  "Maziyah",
+  "Alisha",
+  "Aslam",
+  "Sheraden",
+  "Ummi",
+  "Izzaty",
+  "Azimah",
+  "Nurkhtamal",
+  "Nurzahidah",
+  "Nur Amelea",
+  "Mustadim"
 ];
 
 // ---------------------------------------------------------------------
