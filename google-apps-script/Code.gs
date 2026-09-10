@@ -24,6 +24,22 @@ const ENTRIES_HEADERS = [
   "AnnualDays", "SickDays", "UnpaidDays", "HospitalizeDays", "CreatedAt"
 ];
 
+// Columns that hold a calendar date only (no time-of-day is meaningful).
+// These are written as plain "yyyy-MM-dd" strings from the client, but
+// Google Sheets' automatic type-detection can silently convert them into
+// a real Date cell. When that happens, Sheets anchors the value at
+// midnight UTC — NOT the spreadsheet's local timezone — so these must be
+// read back using UTC too, or the calendar day shifts forward by one
+// once formatted in a timezone ahead of UTC (e.g. "2026-02-06" becoming
+// "2026-02-07"). Always format these as UTC to recover the exact date
+// that was originally entered.
+const DATE_ONLY_FIELDS = ["StartDate", "EndDate"];
+const DATE_ONLY_TZ = "Etc/GMT";
+
+// Columns that hold a genuine timestamp (when a row was created), where
+// the local timezone is what a human reading it would expect.
+const TIMESTAMP_FIELDS = ["CreatedAt"];
+
 function doGet(e) {
   try {
     const configSheet = getOrCreateSheet_(SHEET_STAFF_CONFIG, STAFF_CONFIG_HEADERS);
@@ -68,10 +84,20 @@ function getOrCreateSheet_(name, headers) {
   return sheet;
 }
 
+// Robust "is this cell actually a date" check. A plain `instanceof Date`
+// can fail to catch values coming back from Sheets in some execution
+// contexts. Checking the internal [[Class]] via Object.prototype.toString
+// is the reliable way to detect a Date value regardless of which realm
+// it was constructed in.
+function isDateValue_(v) {
+  return v && Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime());
+}
+
 function sheetToObjects_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
   const headers = values[0];
+  const localTz = Session.getScriptTimeZone();
   const rows = [];
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
@@ -80,7 +106,22 @@ function sheetToObjects_(sheet) {
     const obj = {};
     headers.forEach(function (h, idx) {
       let v = row[idx];
-      if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      const isDateOnly = DATE_ONLY_FIELDS.indexOf(h) !== -1;
+      const isTimestamp = TIMESTAMP_FIELDS.indexOf(h) !== -1;
+      if (isDateValue_(v)) {
+        if (isTimestamp) {
+          v = Utilities.formatDate(v, localTz, "yyyy-MM-dd HH:mm:ss");
+        } else if (isDateOnly) {
+          v = Utilities.formatDate(v, DATE_ONLY_TZ, "yyyy-MM-dd");
+        } else {
+          v = Utilities.formatDate(v, localTz, "yyyy-MM-dd");
+        }
+      } else if (typeof v === "string" && isDateOnly) {
+        // Already a plain string (e.g. "2026-02-06") — leave as-is, but
+        // strip a stray time-of-day/ISO suffix if one ever sneaks in.
+        const m = v.match(/^(\d{4}-\d{2}-\d{2})T/);
+        if (m) v = m[1];
+      }
       obj[h] = v;
     });
     rows.push(obj);
@@ -91,7 +132,9 @@ function sheetToObjects_(sheet) {
 function addEntry_(entry) {
   const sheet = getOrCreateSheet_(SHEET_ENTRIES, ENTRIES_HEADERS);
   const id = Utilities.getUuid();
-  sheet.appendRow([
+  const rowIndex = sheet.getLastRow() + 1;
+  const createdAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  const rowValues = [
     id,
     entry.staff || "",
     entry.startDate || "",
@@ -101,8 +144,16 @@ function addEntry_(entry) {
     Number(entry.sickDays) || 0,
     Number(entry.unpaidDays) || 0,
     Number(entry.hospitalizeDays) || 0,
-    new Date()
-  ]);
+    createdAt
+  ];
+  // Force the StartDate/EndDate/CreatedAt columns to stay plain TEXT, so
+  // Sheets' automatic date-detection never turns them into a Date cell —
+  // that auto-conversion is what caused the day-shift bug in the first
+  // place. Setting the number format to "@" before writing the values
+  // keeps them as the exact strings we send.
+  sheet.getRange(rowIndex, 3, 1, 2).setNumberFormat("@");
+  sheet.getRange(rowIndex, 10, 1, 1).setNumberFormat("@");
+  sheet.getRange(rowIndex, 1, 1, rowValues.length).setValues([rowValues]);
 }
 
 function deleteEntry_(id) {
