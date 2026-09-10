@@ -53,4 +53,4 @@ const LEAVE_FORM_STAFF_NAMES = [
 // instead of data. See SETUP-STAFF-LEAVE-BREAKDOWN.md for the full,
 // one-time setup steps (create the sheet, paste the script, deploy it).
 // ---------------------------------------------------------------------
-const LEAVE_LEDGER_API_URL = "";
+const LEAVE_LEDGER_API_URL = "https://script.google.com/macros/s/AKfycbz8jf69rhlOU-RzSpCvX6G90uYKeM0yHlga8T25eerxUKSq7ZyauD4rfqfxMNT2x2c56Q/exec";
