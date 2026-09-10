@@ -14,196 +14,218 @@
 
 <div class="page">
 
-  <header class="form-header">
-    <img src="assets/micronet-logo.png" alt="Micronet International College" class="logo">
-    <h1>STAFF LEAVE BREAKDOWN</h1>
-  </header>
+<header class="form-header">
+<img src="assets/micronet-logo.png" alt="Micronet International College" class="logo">
+<h1>STAFF LEAVE BREAKDOWN</h1>
+</header>
 
-  <nav class="page-nav">
-    <a href="index.html">&larr; Back to Leave Application Form</a>
-  </nav>
+<nav class="page-nav">
+<a href="index.html">&larr; Back to Leave Application Form</a>
+</nav>
 
-  <div id="setupNotice" class="setup-notice" hidden>
-    <h2>One-time setup needed</h2>
-    <p>
-      This page stores leave records in a Google Sheet, and hasn't been connected to one yet.
-      Follow the steps in <strong>SETUP-STAFF-LEAVE-BREAKDOWN.md</strong> (in the project files) to
-      create the sheet, deploy the Apps Script API, and paste the resulting URL into
-      <code>config.js</code> as <code>LEAVE_LEDGER_API_URL</code>.
-    </p>
-  </div>
+<div id="setupNotice" class="setup-notice" hidden>
+<h2>One-time setup needed</h2>
+<p>
+This page stores leave records in a Google Sheet, and hasn't been connected to one yet.
+Follow the steps in <strong>SETUP-STAFF-LEAVE-BREAKDOWN.md</strong> (in the project files) to
+create the sheet, deploy the Apps Script API, and paste the resulting URL into
+<code>config.js</code> as <code>LEAVE_LEDGER_API_URL</code>.
+</p>
+</div>
 
-  <div id="app" class="form-box" hidden>
+<div id="loginBox" class="form-box" hidden>
+<h2 class="admin-heading">Sign In</h2>
+<p class="admin-note">This page shows leave data, so please sign in with your staff PIN.</p>
+<div class="row">
+<label for="loginStaffSelect">Staff Member</label>
+<select id="loginStaffSelect"></select>
+</div>
+<div class="row">
+<label for="loginPin">PIN</label>
+<input type="password" id="loginPin" inputmode="numeric" maxlength="6" placeholder="6-digit PIN" autocomplete="off">
+</div>
+<div class="button-row">
+<button type="button" id="loginBtn" class="btn primary">Sign In</button>
+</div>
+<p id="loginStatus" class="status-msg" role="status" aria-live="polite"></p>
+</div>
 
-    <div class="row">
-      <label for="staffSelect">Staff Member</label>
-      <select id="staffSelect"></select>
-    </div>
+<div id="app" class="form-box" hidden>
 
-    <div class="row">
-      <label for="yearSelect">Year</label>
-      <select id="yearSelect"></select>
-    </div>
+<div class="row session-bar">
+<span id="sessionLabel"></span>
+<button type="button" id="signOutBtn" class="btn-link">Sign out</button>
+</div>
 
-    <hr class="section-divider">
+<div class="row">
+<label for="staffSelect">Staff Member</label>
+<select id="staffSelect"></select>
+</div>
 
-    <div class="ledger-summary" id="ledgerSummary"></div>
+<div class="row">
+<label for="yearSelect">Year</label>
+<select id="yearSelect"></select>
+</div>
 
-    <hr class="section-divider">
+<hr class="section-divider">
 
-    <h2 class="admin-heading">Add a Leave Entry</h2>
+<div class="ledger-summary" id="ledgerSummary"></div>
 
-    <form id="entryForm" class="entry-form" novalidate>
-      <div class="row">
-        <label for="entryStart">Start Date</label>
-        <input type="date" id="entryStart" required>
-      </div>
-      <div class="row">
-        <label for="entryEnd">End Date <span class="hint">(optional, defaults to start)</span></label>
-        <input type="date" id="entryEnd">
-      </div>
-      <div class="row">
-        <label for="entryDesc">Description</label>
-        <input type="text" id="entryDesc" placeholder="e.g. Travel to KK, Malaysia" required>
-      </div>
-      <fieldset class="row-group entry-days">
-        <legend>Days (fill in only the type(s) that apply)</legend>
-        <div class="inline-fields">
-          <span class="sub-label">Annual:</span>
-          <input type="number" id="entryAnnual" min="0" step="0.5" value="0">
-          <span class="sub-label">Sick:</span>
-          <input type="number" id="entrySick" min="0" step="0.5" value="0">
-          <span class="sub-label">Unpaid:</span>
-          <input type="number" id="entryUnpaid" min="0" step="0.5" value="0">
-          <span class="sub-label">Hospitalize:</span>
-          <input type="number" id="entryHospitalize" min="0" step="0.5" value="0">
-        </div>
-      </fieldset>
-      <div class="button-row">
-        <button type="submit" class="btn primary">+ Add Entry</button>
-      </div>
-      <p id="entryStatus" class="status-msg" role="status" aria-live="polite"></p>
-    </form>
+<hr class="section-divider">
 
-    <hr class="section-divider">
+<h2 class="admin-heading">Add a Leave Entry</h2>
 
-    <details class="staff-config-details" id="importDetails">
-      <summary>Import leave entries from a spreadsheet (.xlsx)</summary>
+<form id="entryForm" class="entry-form" novalidate>
+<div class="row">
+<label for="entryStart">Start Date</label>
+<input type="date" id="entryStart" required>
+</div>
+<div class="row">
+<label for="entryEnd">End Date <span class="hint">(optional, defaults to start)</span></label>
+<input type="date" id="entryEnd">
+</div>
+<div class="row">
+<label for="entryDesc">Description</label>
+<input type="text" id="entryDesc" placeholder="e.g. Travel to KK, Malaysia" required>
+</div>
+<fieldset class="row-group entry-days">
+<legend>Days (fill in only the type(s) that apply)</legend>
+<div class="inline-fields">
+<span class="sub-label">Annual:</span>
+<input type="number" id="entryAnnual" min="0" step="0.5" value="0">
+<span class="sub-label">Sick:</span>
+<input type="number" id="entrySick" min="0" step="0.5" value="0">
+<span class="sub-label">Unpaid:</span>
+<input type="number" id="entryUnpaid" min="0" step="0.5" value="0">
+<span class="sub-label">Hospitalize:</span>
+<input type="number" id="entryHospitalize" min="0" step="0.5" value="0">
+</div>
+</fieldset>
+<div class="button-row">
+<button type="submit" class="btn primary">+ Add Entry</button>
+</div>
+<p id="entryStatus" class="status-msg" role="status" aria-live="polite"></p>
+</form>
 
-      <div class="row">
-        <label for="importFile">Spreadsheet file</label>
-        <input type="file" id="importFile" accept=".xlsx,.xls">
-      </div>
+<hr class="section-divider">
 
-      <div class="row" id="importSheetRow" hidden>
-        <label for="importSheetSelect">Sheet (tab) to import</label>
-        <select id="importSheetSelect"></select>
-      </div>
+<details class="staff-config-details" id="importDetails">
+<summary>Import leave entries from a spreadsheet (.xlsx)</summary>
 
-      <div class="row" id="importStaffRow" hidden>
-        <label for="importStaffSelect">Import as staff member</label>
-        <select id="importStaffSelect"></select>
-      </div>
+<div class="row">
+<label for="importFile">Spreadsheet file</label>
+<input type="file" id="importFile" accept=".xlsx,.xls">
+</div>
 
-      <div class="row" id="importYearRow" hidden>
-        <label for="importYearInput">Leave year</label>
-        <input type="number" id="importYearInput">
-      </div>
+<div class="row" id="importSheetRow" hidden>
+<label for="importSheetSelect">Sheet (tab) to import</label>
+<select id="importSheetSelect"></select>
+</div>
 
-      <div class="button-row" id="importParseRow" hidden>
-        <button type="button" id="importParseBtn" class="btn secondary">Preview</button>
-      </div>
+<div class="row" id="importStaffRow" hidden>
+<label for="importStaffSelect">Import as staff member</label>
+<select id="importStaffSelect"></select>
+</div>
 
-      <p id="importStatus" class="status-msg" role="status" aria-live="polite"></p>
+<div class="row" id="importYearRow" hidden>
+<label for="importYearInput">Leave year</label>
+<input type="number" id="importYearInput">
+</div>
 
-      <div id="importPreviewWrap" hidden>
-        <p class="hint">
-          Rows with a date field outlined in red didn't have a parseable date in the spreadsheet —
-          fill one in before importing. Uncheck any row you don't want to bring in.
-        </p>
-        <div class="ledger-table-wrap">
-          <table class="ledger-table" id="importPreviewTable">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Description</th>
-                <th>Annual</th>
-                <th>Sick</th>
-                <th>Unpaid</th>
-                <th>Hosp.</th>
-              </tr>
-            </thead>
-            <tbody id="importPreviewBody"></tbody>
-          </table>
-        </div>
-        <div class="row">
-          <label>
-            <input type="checkbox" id="importSetConfig" checked>
-            Also set entitlement / carry-forward for this staff &amp; year from the spreadsheet
-          </label>
-        </div>
-        <div class="button-row">
-          <button type="button" id="importCommitBtn" class="btn primary">Import Checked Rows</button>
-        </div>
-        <p id="importCommitStatus" class="status-msg" role="status" aria-live="polite"></p>
-      </div>
-    </details>
+<div class="button-row" id="importParseRow" hidden>
+<button type="button" id="importParseBtn" class="btn secondary">Preview</button>
+</div>
 
-    <hr class="section-divider">
+<p id="importStatus" class="status-msg" role="status" aria-live="polite"></p>
 
-    <h2 class="admin-heading">Monthly Ledger</h2>
-    <div class="ledger-table-wrap">
-      <table class="ledger-table" id="ledgerTable">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Description</th>
-            <th>Annual</th>
-            <th>Sick</th>
-            <th>Unpaid</th>
-            <th>Hosp.</th>
-            <th>Annual Bal.</th>
-            <th>Sick Bal.</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="ledgerBody"></tbody>
-      </table>
-    </div>
+<div id="importPreviewWrap" hidden>
+<p class="hint">
+Rows with a date field outlined in red didn't have a parseable date in the spreadsheet —
+fill one in before importing. Uncheck any row you don't want to bring in.
+</p>
+<div class="ledger-table-wrap">
+<table class="ledger-table" id="importPreviewTable">
+<thead>
+<tr>
+<th></th>
+<th>Start</th>
+<th>End</th>
+<th>Description</th>
+<th>Annual</th>
+<th>Sick</th>
+<th>Unpaid</th>
+<th>Hosp.</th>
+</tr>
+</thead>
+<tbody id="importPreviewBody"></tbody>
+</table>
+</div>
+<div class="row">
+<label>
+<input type="checkbox" id="importSetConfig" checked>
+Also set entitlement / carry-forward for this staff &amp; year from the spreadsheet
+</label>
+</div>
+<div class="button-row">
+<button type="button" id="importCommitBtn" class="btn primary">Import Checked Rows</button>
+</div>
+<p id="importCommitStatus" class="status-msg" role="status" aria-live="polite"></p>
+</div>
+</details>
 
-    <hr class="section-divider">
+<hr class="section-divider">
 
-    <details class="staff-config-details">
-      <summary>Edit entitlement / carry-forward for this staff member &amp; year</summary>
-      <div class="row">
-        <label for="cfgAnnualEntitlement">Annual Leave Entitlement</label>
-        <input type="number" id="cfgAnnualEntitlement" min="0" step="0.5">
-      </div>
-      <div class="row">
-        <label for="cfgAnnualCarryForward">Annual Leave Carried Forward</label>
-        <input type="number" id="cfgAnnualCarryForward" min="0" step="0.5">
-      </div>
-      <div class="row">
-        <label for="cfgSickEntitlement">Sick Leave Entitlement</label>
-        <input type="number" id="cfgSickEntitlement" min="0" step="0.5">
-      </div>
-      <div class="row">
-        <label for="cfgSickCarryForward">Sick Leave Carried Forward</label>
-        <input type="number" id="cfgSickCarryForward" min="0" step="0.5">
-      </div>
-      <div class="button-row">
-        <button type="button" id="saveConfigBtn" class="btn secondary">Save Entitlement</button>
-      </div>
-      <p id="configStatus" class="status-msg" role="status" aria-live="polite"></p>
-    </details>
+<h2 class="admin-heading">Monthly Ledger</h2>
+<div class="ledger-table-wrap">
+<table class="ledger-table" id="ledgerTable">
+<thead>
+<tr>
+<th>Date</th>
+<th>Description</th>
+<th>Annual</th>
+<th>Sick</th>
+<th>Unpaid</th>
+<th>Hosp.</th>
+<th>Annual Bal.</th>
+<th>Sick Bal.</th>
+<th></th>
+</tr>
+</thead>
+<tbody id="ledgerBody"></tbody>
+</table>
+</div>
 
-  </div>
+<hr class="section-divider">
 
-  <footer class="app-footer">
-    Micronet International College &middot; Staff Leave Breakdown
-  </footer>
+<details class="staff-config-details" id="configDetails">
+<summary>Edit entitlement / carry-forward for this staff member &amp; year</summary>
+<div class="row">
+<label for="cfgAnnualEntitlement">Annual Leave Entitlement</label>
+<input type="number" id="cfgAnnualEntitlement" min="0" step="0.5">
+</div>
+<div class="row">
+<label for="cfgAnnualCarryForward">Annual Leave Carried Forward</label>
+<input type="number" id="cfgAnnualCarryForward" min="0" step="0.5">
+</div>
+<div class="row">
+<label for="cfgSickEntitlement">Sick Leave Entitlement</label>
+<input type="number" id="cfgSickEntitlement" min="0" step="0.5">
+</div>
+<div class="row">
+<label for="cfgSickCarryForward">Sick Leave Carried Forward</label>
+<input type="number" id="cfgSickCarryForward" min="0" step="0.5">
+</div>
+<div class="button-row">
+<button type="button" id="saveConfigBtn" class="btn secondary">Save Entitlement</button>
+</div>
+<p id="configStatus" class="status-msg" role="status" aria-live="polite"></p>
+</details>
+
+</div>
+
+<footer class="app-footer">
+Micronet International College &middot; Staff Leave Breakdown
+</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
