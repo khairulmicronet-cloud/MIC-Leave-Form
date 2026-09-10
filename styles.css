@@ -316,3 +316,13 @@ body {
   .row label { flex: 0 0 100%; }
   .form-header .logo { float: none; margin: 0 auto 8px; }
 }
+
+.session-bar {
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #444;
+}
+.session-bar #sessionLabel {
+  font-weight: 700;
+}
