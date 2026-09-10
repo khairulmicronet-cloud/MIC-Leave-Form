@@ -1,4 +1,4 @@
-const CACHE_NAME = "leave-form-cache-v5";
+const CACHE_NAME = "leave-form-cache-v7";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,8 @@ const ASSETS = [
   "./app.js",
   "./config.js",
   "./manifest.json",
+  "./leave-breakdown.html",
+  "./leave-breakdown.js",
   "./assets/micronet-logo.png",
   "./assets/leave-form-template.docx",
   "./icons/icon-192.png",
@@ -28,6 +30,18 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+
+  // Never cache-first the Google Apps Script API (or any cross-origin API
+  // call): the Staff Leave Breakdown page needs live, up-to-date leave data,
+  // not a stale snapshot served from Cache Storage. Always go to the
+  // network for these and don't store the response.
+  const isApiCall = url.origin !== self.location.origin && url.hostname.includes("script.google");
+  if (isApiCall) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
