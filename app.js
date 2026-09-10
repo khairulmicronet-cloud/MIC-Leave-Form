@@ -246,7 +246,7 @@
       );
       const mcSize = scaledEmuSize(mcImage.width, mcImage.height, 5940000, 7000000);
       const mcXml =
-        '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Medical Certificate / Supporting Document Attached:</w:t></w:r>' +
+        '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Supporting Document(s) Attached:</w:t></w:r>' +
         '<w:r><w:br/></w:r>' +
         inlineImageRunXml("rIdMcImg", 901, mcSize.cx, mcSize.cy);
       xml = xml.replace(mcToken, mcXml);
