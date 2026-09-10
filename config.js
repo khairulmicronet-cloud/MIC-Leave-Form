@@ -43,3 +43,14 @@ const LEAVE_FORM_STAFF_NAMES = [
   "Veronica",
   "Hariz"
 ];
+
+// ---------------------------------------------------------------------
+// Staff Leave Breakdown (leave-breakdown.html) data source.
+//
+// This page reads/writes leave records from a Google Sheet through a
+// Google Apps Script Web App acting as a tiny API. Until you deploy that
+// script and paste its URL below, the page will show setup instructions
+// instead of data. See SETUP-STAFF-LEAVE-BREAKDOWN.md for the full,
+// one-time setup steps (create the sheet, paste the script, deploy it).
+// ---------------------------------------------------------------------
+const LEAVE_LEDGER_API_URL = "";
