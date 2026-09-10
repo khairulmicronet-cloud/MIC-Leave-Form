@@ -170,7 +170,11 @@ appEl.hidden = false;
 const auth = window.MIC_AUTH;
 const isAdmin = auth.role === "admin";
 
-sessionLabel.textContent = "Signed in as " + auth.staff + (isAdmin ? " (admin)" : "");
+// Khairul keeps full admin access (all staff visible, import/config
+// shown) but the on-screen label reads as regular staff.
+const HIDE_ADMIN_LABEL_FOR = ["Khairul"];
+const showAdminLabel = isAdmin && HIDE_ADMIN_LABEL_FOR.indexOf(auth.staff) === -1;
+sessionLabel.textContent = "Signed in as " + auth.staff + (showAdminLabel ? " (admin)" : "");
 
 // Admin-only sections: hidden entirely for regular staff. The backend
 // also refuses these actions for non-admins, so this is a convenience,
