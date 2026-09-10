@@ -71,10 +71,37 @@
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error || "Failed to load data");
       state.config = data.config || [];
-      state.entries = data.entries || [];
+      state.entries = (data.entries || []).map(function (e) {
+        return Object.assign({}, e, {
+          StartDate: normalizeDate(e.StartDate),
+          EndDate: normalizeDate(e.EndDate)
+        });
+      });
       render();
     } catch (err) {
       ledgerSummary.textContent = "Could not load data: " + err.message;
+    }
+  }
+
+  // The Apps Script backend is supposed to hand back plain "yyyy-MM-dd"
+  // strings, but depending on which script version is actually deployed,
+  // Google Sheets' automatic date-detection can turn a stored date string
+  // into a real Date cell, which then comes back as a full ISO timestamp
+  // (e.g. "2026-02-06T16:00:00.000Z") — a calendar day off from what was
+  // entered once you're east of UTC. Normalize defensively here so the
+  // ledger always displays the correct calendar date regardless of what
+  // the backend currently returns.
+  function normalizeDate(v) {
+    if (!v) return v;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return v;
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Brunei", year: "numeric", month: "2-digit", day: "2-digit"
+      }).format(d);
+    } catch (e) {
+      return v;
     }
   }
 
