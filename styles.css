@@ -243,6 +243,75 @@ body {
   margin: 16px 0 8px;
 }
 
+.page-nav {
+  max-width: 720px;
+  margin: 0 auto 12px;
+  font-size: 0.85rem;
+}
+.page-nav a {
+  color: var(--navy);
+  text-decoration: none;
+}
+.page-nav a:hover { text-decoration: underline; }
+
+.setup-notice {
+  max-width: 720px;
+  margin: 0 auto;
+  background: #fff8e1;
+  border: 1.5px solid #e0c46c;
+  border-radius: 6px;
+  padding: 16px 18px;
+}
+.setup-notice h2 { margin-top: 0; font-size: 1.05rem; }
+.setup-notice code {
+  background: #f0f0f0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.entry-days .inline-fields input[type="number"] {
+  flex: 0 1 70px;
+}
+
+.ledger-table-wrap {
+  overflow-x: auto;
+}
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.ledger-table th,
+.ledger-table td {
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+.ledger-table th {
+  background: var(--admin-bg);
+}
+.ledger-table tbody tr:nth-child(even) {
+  background: #fafbfd;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #b3261e;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.staff-config-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
 @media (max-width: 520px) {
   .row label { flex: 0 0 100%; }
   .form-header .logo { float: none; margin: 0 auto 8px; }
