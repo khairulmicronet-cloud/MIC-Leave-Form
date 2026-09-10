@@ -326,3 +326,7 @@ body {
 .session-bar #sessionLabel {
   font-weight: 700;
 }
+
+[hidden] {
+  display: none !important;
+}
