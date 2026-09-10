@@ -1,4 +1,4 @@
-const CACHE_NAME = "leave-form-cache-v7";
+const CACHE_NAME = "leave-form-cache-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./manifest.json",
   "./leave-breakdown.html",
   "./leave-breakdown.js",
+  "./leave-import.js",
   "./assets/micronet-logo.png",
   "./assets/leave-form-template.docx",
   "./icons/icon-192.png",
