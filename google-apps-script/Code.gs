@@ -257,9 +257,13 @@ function login_(staff, pin) {
     }
 
     // 2) The master PIN, signing in AS this staff member (admin override).
+    // The operator here is the admin holding the master PIN, not the
+    // impersonated staff member, so the session always gets admin
+    // privileges (add/edit/delete for anyone) regardless of that staff
+    // member's own configured role.
     if (masterHash && pinHash === masterHash) {
-      const token = signToken_({ staff: row[0], role: role, iat: Date.now(), viaMaster: true });
-      return { ok: true, token: token, role: role, staff: row[0], mustChangePin: false, viaMaster: true };
+      const token = signToken_({ staff: row[0], role: "admin", iat: Date.now(), viaMaster: true });
+      return { ok: true, token: token, role: "admin", staff: row[0], mustChangePin: false, viaMaster: true };
     }
 
     return { ok: false, error: "Incorrect PIN." };
