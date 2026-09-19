@@ -126,10 +126,6 @@
       form.reportValidity();
       return null;
     }
-    if (!signatureImage) {
-      setStatus("Please upload a signature image.", "error");
-      return null;
-    }
     return {
       name: $("name").value.trim(),
       startDate: $("startDate").value,
@@ -221,17 +217,22 @@
       }
     }
 
-    const sigExt = signatureImage.ext === "png" ? "png" : "jpeg";
-    ensureContentTypeDefault(sigExt, sigExt === "png" ? "image/png" : "image/jpeg");
-    zip.file(`word/media/signature.${sigExt}`, signatureImage.buffer);
-    relsXml = relsXml.replace(
-      "</Relationships>",
-      `<Relationship Id="rIdSignatureImg" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/signature.${sigExt}"/></Relationships>`
-    );
-    const sigSize = scaledEmuSize(signatureImage.width, signatureImage.height, 1700000, 500000);
     const sigToken = '<w:r><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>{{SIGNATURE_IMAGE}}</w:t></w:r>';
     if (xml.indexOf(sigToken) === -1) throw new Error("Template is missing the signature placeholder run.");
-    xml = xml.replace(sigToken, inlineImageRunXml("rIdSignatureImg", 900, sigSize.cx, sigSize.cy));
+    if (signatureImage) {
+      const sigExt = signatureImage.ext === "png" ? "png" : "jpeg";
+      ensureContentTypeDefault(sigExt, sigExt === "png" ? "image/png" : "image/jpeg");
+      zip.file(`word/media/signature.${sigExt}`, signatureImage.buffer);
+      relsXml = relsXml.replace(
+        "</Relationships>",
+        `<Relationship Id="rIdSignatureImg" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/signature.${sigExt}"/></Relationships>`
+      );
+      const sigSize = scaledEmuSize(signatureImage.width, signatureImage.height, 1700000, 500000);
+      xml = xml.replace(sigToken, inlineImageRunXml("rIdSignatureImg", 900, sigSize.cx, sigSize.cy));
+    } else {
+      // No signature uploaded — leave the line blank so the printed copy can be signed by hand.
+      xml = xml.replace(sigToken, "");
+    }
 
     // ---- Optional Medical Certificate attachment (page 2), only if the user attached one ----
     const mcToken = "<w:r><w:t>{{MC_ATTACHMENT}}</w:t></w:r>";
