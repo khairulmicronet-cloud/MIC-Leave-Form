@@ -50,10 +50,29 @@ create the sheet, deploy the Apps Script API, and paste the resulting URL into
 <p id="loginStatus" class="status-msg" role="status" aria-live="polite"></p>
 </div>
 
+<div id="changePinBox" class="form-box" hidden>
+<h2 class="admin-heading">Set Your PIN</h2>
+<p class="admin-note" id="changePinNote">Your PIN is temporary. Please choose a new 6-digit PIN only you know.</p>
+<div class="row">
+<label for="newPin1">New PIN</label>
+<input type="password" id="newPin1" inputmode="numeric" maxlength="6" placeholder="6-digit PIN" autocomplete="off">
+</div>
+<div class="row">
+<label for="newPin2">Confirm New PIN</label>
+<input type="password" id="newPin2" inputmode="numeric" maxlength="6" placeholder="Re-enter PIN" autocomplete="off">
+</div>
+<div class="button-row">
+<button type="button" id="changePinBtn" class="btn primary">Save New PIN</button>
+<button type="button" id="changePinCancelBtn" class="btn secondary" hidden>Cancel</button>
+</div>
+<p id="changePinStatus" class="status-msg" role="status" aria-live="polite"></p>
+</div>
+
 <div id="app" class="form-box" hidden>
 
 <div class="row session-bar">
 <span id="sessionLabel"></span>
+<button type="button" id="changePinLinkBtn" class="btn-link">Change PIN</button>
 <button type="button" id="signOutBtn" class="btn-link">Sign out</button>
 </div>
 
@@ -73,7 +92,9 @@ create the sheet, deploy the Apps Script API, and paste the resulting URL into
 
 <hr class="section-divider">
 
+<div id="entrySection">
 <h2 class="admin-heading">Add a Leave Entry</h2>
+<p class="admin-note">Admin only &mdash; staff see a read-only copy of their own ledger below.</p>
 
 <form id="entryForm" class="entry-form" novalidate>
 <div class="row">
@@ -106,6 +127,7 @@ create the sheet, deploy the Apps Script API, and paste the resulting URL into
 </div>
 <p id="entryStatus" class="status-msg" role="status" aria-live="polite"></p>
 </form>
+</div>
 
 <hr class="section-divider">
 
@@ -200,7 +222,7 @@ Also set entitlement / carry-forward for this staff &amp; year from the spreadsh
 <details class="staff-config-details" id="configDetails">
 <summary>Edit entitlement / carry-forward for this staff member &amp; year</summary>
 <div class="row">
-<label for="cfgAnnualEntitlement">Annual Leave Entitlement</label>
+<label for="cfgAnnualEntitlement">Annual Leave Entitlement <span class="hint">(full-year total; released monthly, see balance note)</span></label>
 <input type="number" id="cfgAnnualEntitlement" min="0" step="0.5">
 </div>
 <div class="row">
