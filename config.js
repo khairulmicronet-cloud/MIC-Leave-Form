@@ -57,7 +57,10 @@ const LEAVE_FORM_STAFF_NAMES = [
   "Nurkhtamal",
   "Nurzahidah",
   "Nur Amelea",
-  "Mustadim"
+  "Mustadim",
+  "Sharon",
+  "Crisanta",
+  "Kalau"
 ];
 
 // ---------------------------------------------------------------------
