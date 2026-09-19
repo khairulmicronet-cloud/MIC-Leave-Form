@@ -8,19 +8,34 @@
 // LeaveEntries: one row per leave event (a date range, a description,
 // and however many Annual/Sick/Unpaid/Hospitalize days it used).
 //
-// Running balances are computed here in the browser (Annual/Sick balance
-// = carry-forward + entitlement − sum of days used so far this year);
+// Running balances are computed here in the browser. Sick balance is a
+// flat pool (carry-forward + entitlement − used). Annual balance accrues
+// monthly instead of being available in full on 1 January: 1 day is
+// released on the 1st of each month (Jan–Oct), 2 days on 1 Nov, 2 days
+// on 1 Dec, plus 1 more on 31 Dec — 15 "shares" total for a staff member
+// on the default 15-day entitlement. A different configured entitlement
+// scales every release proportionally (see accruedAnnual() below).
 // Unpaid/Hospitalize have no entitlement, they're just running totals.
 //
 // Access control:
 // Every request to the backend must carry a signed token obtained by
 // signing in with a staff name + PIN (see login_() in the Apps Script
 // backend). Admins (currently Khairul and Maziyah) see and edit every
-// staff member's data; everyone else sees and edits only their own
-// entries, and never sees the "Import from spreadsheet" or "Edit
-// entitlement / carry-forward" sections at all (those actions are also
-// blocked server-side, so hiding them here is a UX convenience, not the
-// actual security boundary).
+// staff member's data. Everyone else gets a read-only view of their own
+// record: adding a leave entry, editing entitlement/carry-forward, and
+// the spreadsheet import are all admin-only now (so only admins tally
+// leave against entitlement — no risk of a duplicate or stray entry
+// entered by the staff member themselves), and those sections are
+// hidden entirely for non-admins (those actions are also blocked
+// server-side, so hiding them here is a UX convenience, not the actual
+// security boundary).
+//
+// PIN model: a PIN handed out by an admin is temporary — the first time
+// it's used to sign in, this page forces a "set your own PIN" step
+// before showing any data (see showChangePin()). Maziyah additionally
+// has a master PIN: entering it on the login screen for ANY staff name
+// signs her in as that person (their exact view/edit access), which is
+// how she can check, edit or reset another staff member's data or PIN.
 //
 // The signed-in session (token, staff, role) is kept in localStorage so
 // people don't have to re-enter their PIN every visit, and is also
@@ -43,6 +58,15 @@ const loginPin = document.getElementById("loginPin");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
+const changePinBox = document.getElementById("changePinBox");
+const changePinNote = document.getElementById("changePinNote");
+const newPin1 = document.getElementById("newPin1");
+const newPin2 = document.getElementById("newPin2");
+const changePinBtn = document.getElementById("changePinBtn");
+const changePinCancelBtn = document.getElementById("changePinCancelBtn");
+const changePinStatus = document.getElementById("changePinStatus");
+const changePinLinkBtn = document.getElementById("changePinLinkBtn");
+
 const appEl = document.getElementById("app");
 const sessionLabel = document.getElementById("sessionLabel");
 const signOutBtn = document.getElementById("signOutBtn");
@@ -50,6 +74,7 @@ const staffSelect = document.getElementById("staffSelect");
 const yearSelect = document.getElementById("yearSelect");
 const ledgerSummary = document.getElementById("ledgerSummary");
 const ledgerBody = document.getElementById("ledgerBody");
+const entrySection = document.getElementById("entrySection");
 const entryForm = document.getElementById("entryForm");
 const entryStatus = document.getElementById("entryStatus");
 const configStatus = document.getElementById("configStatus");
@@ -73,6 +98,14 @@ loginPin.addEventListener("keydown", function (ev) {
 if (ev.key === "Enter") onLogin();
 });
 signOutBtn.addEventListener("click", onSignOut);
+if (changePinBtn) changePinBtn.addEventListener("click", onChangePin);
+if (changePinCancelBtn) changePinCancelBtn.addEventListener("click", function () {
+changePinBox.hidden = true;
+appEl.hidden = false;
+});
+if (changePinLinkBtn) changePinLinkBtn.addEventListener("click", function () { showChangePin(false); });
+if (newPin1) newPin1.addEventListener("keydown", function (ev) { if (ev.key === "Enter") newPin2.focus(); });
+if (newPin2) newPin2.addEventListener("keydown", function (ev) { if (ev.key === "Enter") onChangePin(); });
 
 const saved = readSavedAuth();
 if (saved) {
@@ -110,6 +143,7 @@ try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch (e) { /* ignore */ }
 
 function showLogin() {
 appEl.hidden = true;
+changePinBox.hidden = true;
 loginBox.hidden = false;
 
 if (!loginStaffSelect.options.length) {
@@ -123,6 +157,24 @@ loginStaffSelect.appendChild(opt);
 loginPin.value = "";
 loginStatus.textContent = "";
 loginStatus.className = "status-msg";
+}
+
+// required === true: this is the forced first-sign-in flow (no Cancel,
+// can't be dismissed). required === false: the person opened "Change
+// PIN" from an already-signed-in session, and can cancel back to the app.
+function showChangePin(required) {
+loginBox.hidden = true;
+appEl.hidden = true;
+changePinBox.hidden = false;
+newPin1.value = "";
+newPin2.value = "";
+changePinStatus.textContent = "";
+changePinStatus.className = "status-msg";
+changePinNote.textContent = required
+? "Your PIN is temporary. Please set a new 6-digit PIN that only you know before continuing."
+: "Choose a new 6-digit PIN.";
+if (changePinCancelBtn) changePinCancelBtn.hidden = required;
+newPin1.focus();
 }
 
 async function onLogin() {
@@ -145,15 +197,51 @@ body: JSON.stringify({ action: "login", staff: staff, pin: pin })
 const data = await resp.json();
 if (!data.ok) throw new Error(data.error || "Sign in failed.");
 
-const auth = { token: data.token, staff: data.staff, role: data.role };
+const auth = { token: data.token, staff: data.staff, role: data.role, viaMaster: !!data.viaMaster };
 window.MIC_AUTH = auth;
+if (data.mustChangePin) {
+// Don't persist yet — the temporary PIN must not survive a reload
+// without the person actually setting their own permanent one.
+showChangePin(true);
+} else {
 saveAuth(auth);
 startApp();
+}
 } catch (err) {
 loginStatus.textContent = "Error: " + err.message;
 loginStatus.className = "status-msg error";
 } finally {
 loginBtn.disabled = false;
+}
+}
+
+async function onChangePin() {
+const p1 = newPin1.value.trim();
+const p2 = newPin2.value.trim();
+if (!/^\d{6}$/.test(p1)) {
+changePinStatus.textContent = "PIN must be exactly 6 digits.";
+changePinStatus.className = "status-msg error";
+return;
+}
+if (p1 !== p2) {
+changePinStatus.textContent = "PINs don't match.";
+changePinStatus.className = "status-msg error";
+return;
+}
+changePinBtn.disabled = true;
+changePinStatus.textContent = "Saving…";
+changePinStatus.className = "status-msg";
+try {
+await postAction({ action: "changePin", newPin: p1 });
+saveAuth(window.MIC_AUTH);
+changePinBox.hidden = true;
+startApp();
+} catch (err) {
+if (isAuthError(err)) { handleAuthError(); return; }
+changePinStatus.textContent = "Error: " + err.message;
+changePinStatus.className = "status-msg error";
+} finally {
+changePinBtn.disabled = false;
 }
 }
 
@@ -165,6 +253,7 @@ window.location.reload();
 
 function startApp() {
 loginBox.hidden = true;
+changePinBox.hidden = true;
 appEl.hidden = false;
 
 const auth = window.MIC_AUTH;
@@ -174,11 +263,17 @@ const isAdmin = auth.role === "admin";
 // shown) but the on-screen label reads as regular staff.
 const HIDE_ADMIN_LABEL_FOR = ["Khairul"];
 const showAdminLabel = isAdmin && HIDE_ADMIN_LABEL_FOR.indexOf(auth.staff) === -1;
-sessionLabel.textContent = "Signed in as " + auth.staff + (showAdminLabel ? " (admin)" : "");
+sessionLabel.textContent = "Signed in as " + auth.staff +
+(showAdminLabel ? " (admin)" : "") +
+(auth.viaMaster ? " (via master PIN)" : "");
 
-// Admin-only sections: hidden entirely for regular staff. The backend
-// also refuses these actions for non-admins, so this is a convenience,
-// not the actual boundary.
+// Admin-only sections: hidden entirely for regular staff. Adding leave
+// entries, editing entitlement/carry-forward, and the spreadsheet import
+// are all admin actions now — only admins tally leave, so staff get a
+// read-only ledger of their own record. The backend also refuses these
+// actions for non-admins, so this is a convenience, not the actual
+// boundary.
+if (entrySection) entrySection.hidden = !isAdmin;
 if (importDetails) importDetails.hidden = !isAdmin;
 if (configDetails) configDetails.hidden = !isAdmin;
 
@@ -291,6 +386,42 @@ return e.Staff === staff && (e.StartDate || "").slice(0, 4) === String(year);
 .sort(function (a, b) { return (a.StartDate || "").localeCompare(b.StartDate || ""); });
 }
 
+// How much of a staff member's Annual Leave entitlement has actually
+// been released as of `asOf`, for the given `year`:
+//   - a year already in the past is fully accrued (the whole entitlement)
+//   - a year not yet started hasn't accrued anything
+//   - the current year accrues progressively: 1 "share" released on the
+//     1st of each month Jan–Oct, 2 shares on 1 Nov, 2 shares on 1 Dec,
+//     and 1 more share on 31 Dec (15 shares total, matching a 15-day
+//     entitlement). A different configured entitlement scales every
+//     share proportionally, e.g. a 12-day entitlement releases 12/15 of
+//     a share at each of the same release points.
+function accruedAnnual(entitlement, year, asOf) {
+const e = Number(entitlement) || 0;
+const y = Number(year);
+const currentYear = asOf.getFullYear();
+if (y < currentYear) return e;
+if (y > currentYear) return 0;
+
+const sharesPerDay = e / 15;
+const month = asOf.getMonth(); // 0 = Jan … 11 = Dec
+const day = asOf.getDate();
+let shares = 0;
+for (let m = 0; m <= month; m++) {
+if (m <= 9) { // Jan–Oct
+shares += 1;
+} else if (m === 10) { // Nov
+shares += 2;
+} else { // Dec
+shares += 2;
+if (day >= 31) shares += 1;
+}
+}
+// Round to the nearest half-day for a clean display; exact for the
+// default 15-day schedule, a close approximation for any other total.
+return Math.round(shares * sharesPerDay * 2) / 2;
+}
+
 function render() {
 const staff = currentStaff();
 const year = currentYear();
@@ -298,13 +429,14 @@ if (!staff || !year) return;
 
 const cfg = getConfigFor(staff, year);
 const entries = entriesFor(staff, year);
+const isAdmin = window.MIC_AUTH.role === "admin";
 
 document.getElementById("cfgAnnualEntitlement").value = cfg.AnnualEntitlement || 0;
 document.getElementById("cfgAnnualCarryForward").value = cfg.AnnualCarryForward || 0;
 document.getElementById("cfgSickEntitlement").value = cfg.SickEntitlement || 0;
 document.getElementById("cfgSickCarryForward").value = cfg.SickCarryForward || 0;
 
-let annualBal = Number(cfg.AnnualCarryForward || 0) + Number(cfg.AnnualEntitlement || 0);
+let annualBal = Number(cfg.AnnualCarryForward || 0) + accruedAnnual(cfg.AnnualEntitlement, year, new Date());
 let sickBal = Number(cfg.SickCarryForward || 0) + Number(cfg.SickEntitlement || 0);
 let unpaidTotal = 0;
 let hospitalizeTotal = 0;
@@ -327,7 +459,7 @@ tr.innerHTML =
 "<td>" + fmtDays(e.HospitalizeDays) + "</td>" +
 "<td>" + annualBal + "</td>" +
 "<td>" + sickBal + "</td>" +
-'<td><button type="button" class="btn-link delete-entry" data-id="' + escapeHtml(e.ID) + '">Delete</button></td>';
+"<td>" + (isAdmin ? '<button type="button" class="btn-link delete-entry" data-id="' + escapeHtml(e.ID) + '">Delete</button>' : "") + "</td>";
 ledgerBody.appendChild(tr);
 });
 
@@ -335,13 +467,17 @@ ledgerBody.querySelectorAll(".delete-entry").forEach(function (btn) {
 btn.addEventListener("click", function () { onDeleteEntry(btn.getAttribute("data-id")); });
 });
 
+const annualNote = String(year) === String(new Date().getFullYear())
+? "<p class=\"hint\">Annual leave accrues monthly: 1 day on the 1st of each month (Jan–Oct), 2 days on 1 Nov, 2 days on 1 Dec, plus 1 more on 31 Dec.</p>"
+: "";
+
 ledgerSummary.innerHTML =
 '<div class="admin-preview">' +
 "<div class=\"admin-row\"><strong>Annual Leave Balance</strong> &nbsp; " + annualBal + " day(s)</div>" +
 "<div class=\"admin-row\"><strong>Sick Leave Balance</strong> &nbsp; " + sickBal + " day(s)</div>" +
 "<div class=\"admin-row\"><strong>Unpaid Leave Taken (this year)</strong> &nbsp; " + unpaidTotal + " day(s)</div>" +
 "<div class=\"admin-row\"><strong>Hospitalize Leave Taken (this year)</strong> &nbsp; " + hospitalizeTotal + " day(s)</div>" +
-"</div>";
+"</div>" + annualNote;
 }
 
 function fmtDays(v) {
