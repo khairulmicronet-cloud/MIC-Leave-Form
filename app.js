@@ -357,10 +357,6 @@
   $("downloadBtn").addEventListener("click", handleDownload);
   $("emailBtn").addEventListener("click", handleEmail);
 
-  // ---- PWA: register service worker ----
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => console.warn("SW registration failed", err));
-    });
-  }
+  // ---- PWA: service worker registration + auto-update now live in
+  // sw-update.js (shared by every page) ----
 })();
