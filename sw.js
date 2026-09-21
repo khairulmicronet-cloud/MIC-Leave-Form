@@ -1,10 +1,11 @@
-const CACHE_NAME = "leave-form-cache-v11";
+const CACHE_NAME = "leave-form-cache-v12";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./config.js",
+  "./sw-update.js",
   "./manifest.json",
   "./leave-breakdown.html",
   "./leave-breakdown.js",
