@@ -11,18 +11,39 @@ const LEAVE_FORM_CONFIG = {
 
   emailGreetingName: "Ms. Maziyyah",
 
-  // Signature block appended to the email body, matching your usual sign-off
-  signatureBlock: [
-    "Best Regards,",
-    "",
-    "Awangku Muhammad Khairul Amir Pengiran Darma Putra",
-    "Lecturer",
-    "",
+  // ---------------------------------------------------------------------
+  // Submission email sign-off. The "Prepare Submission Email" button signs
+  // the email as whoever is picked in the Name dropdown, not always
+  // Khairul:
+  //   - A name listed here in signatureOverrides gets its full, personal
+  //     block (title, direct extension, mobile, email) exactly as before.
+  //   - Any other staff name gets their own name + the general College
+  //     address block below (genericSignatureCollegeBlock) — no personal
+  //     extension/mobile/email, since those aren't on file per staff.
+  // To give another staff member their own full block, add an entry here
+  // keyed by their exact name as it appears in LEAVE_FORM_STAFF_NAMES.
+  // ---------------------------------------------------------------------
+  signatureOverrides: {
+    "Khairul": [
+      "Best Regards,",
+      "",
+      "Awangku Muhammad Khairul Amir Pengiran Darma Putra",
+      "Lecturer",
+      "",
+      "MICRONET INTERNATIONAL COLLEGE",
+      "Gadong Campus [Head Office]:",
+      "No. 11 & 12, Kompleks Hj Tahir 2, Sungai Gadong Menglait, BSB BE4119 Brunei Darussalam   P O Box 933 Gadong BE3978",
+      "O: +673-2451133 ext 13    M: +673-7250492    F: +673-2450888",
+      "E: khairul@micronet.com.bn    www.micronet.com.bn"
+    ].join("\n")
+  },
+
+  genericSignatureCollegeBlock: [
     "MICRONET INTERNATIONAL COLLEGE",
     "Gadong Campus [Head Office]:",
     "No. 11 & 12, Kompleks Hj Tahir 2, Sungai Gadong Menglait, BSB BE4119 Brunei Darussalam   P O Box 933 Gadong BE3978",
-    "O: +673-2451133 ext 13    M: +673-7250492    F: +673-2450888",
-    "E: khairul@micronet.com.bn    www.micronet.com.bn"
+    "O: +673-2451133    F: +673-2450888",
+    "www.micronet.com.bn"
   ].join("\n")
 };
 
