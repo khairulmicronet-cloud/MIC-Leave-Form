@@ -14,10 +14,15 @@
 // only written to the ledger once the admin reviews the preview and clicks
 // "Import Checked Rows".
 //
-// This whole section is admin-only (hidden in the UI for regular staff by
-// leave-breakdown.js, and refused server-side for anyone else), so the
-// signed-in admin's token — set on window.MIC_AUTH by leave-breakdown.js
-// after sign-in — is attached to every request here too.
+// This section is open to every signed-in staff member. An admin can
+// import as any staff member and set entitlement/carry-forward from the
+// spreadsheet (unchanged); a regular staff member can only import as
+// themselves, can't touch entitlement/carry-forward, and their rows go
+// to an admin for review (addEntry_ on the backend routes a non-admin's
+// entry into PendingEntries instead of the live ledger) rather than
+// landing on the ledger immediately. Either way the signed-in person's
+// token — set on window.MIC_AUTH by leave-breakdown.js after sign-in —
+// is attached to every request here.
 // ---------------------------------------------------------------------
 
 (function () {
@@ -38,6 +43,7 @@ const status = document.getElementById("importStatus");
 const previewWrap = document.getElementById("importPreviewWrap");
 const previewBody = document.getElementById("importPreviewBody");
 const setConfigChk = document.getElementById("importSetConfig");
+const setConfigRow = document.getElementById("importSetConfigRow");
 const commitBtn = document.getElementById("importCommitBtn");
 const commitStatus = document.getElementById("importCommitStatus");
 
@@ -119,13 +125,30 @@ opt.textContent = name;
 sheetSelect.appendChild(opt);
 });
 
+const isAdmin = window.MIC_AUTH && window.MIC_AUTH.role === "admin";
+
 staffSelect.innerHTML = "";
+if (isAdmin) {
 STAFF_NAMES.forEach(function (name) {
 const opt = document.createElement("option");
 opt.value = name;
 opt.textContent = name;
 staffSelect.appendChild(opt);
 });
+staffSelect.disabled = false;
+} else {
+const opt = document.createElement("option");
+opt.value = window.MIC_AUTH.staff;
+opt.textContent = window.MIC_AUTH.staff;
+staffSelect.appendChild(opt);
+staffSelect.value = window.MIC_AUTH.staff;
+staffSelect.disabled = true;
+}
+
+// Entitlement / carry-forward stays admin-only, same as the manual "Add
+// a Leave Entry" form and the Edit Entitlement section.
+if (setConfigRow) setConfigRow.hidden = !isAdmin;
+if (!isAdmin) setConfigChk.checked = false;
 
 yearInput.value = new Date().getFullYear();
 
@@ -279,10 +302,12 @@ commitStatus.className = "status-msg error";
 return;
 }
 
+const isAdmin = window.MIC_AUTH && window.MIC_AUTH.role === "admin";
+
 commitBtn.disabled = true;
 commitStatus.className = "status-msg";
 try {
-if (setConfigChk.checked && parsedConfig) {
+if (isAdmin && setConfigChk.checked && parsedConfig) {
 commitStatus.textContent = "Saving entitlement…";
 await postAction({
 action: "upsertConfig",
@@ -315,7 +340,9 @@ hospitalizeDays: r.hosp
 });
 }
 
-commitStatus.textContent = "Imported " + toImport.length + " entry(ies). Reloading ledger…";
+commitStatus.textContent = isAdmin
+? "Imported " + toImport.length + " entry(ies). Reloading ledger…"
+: "Submitted " + toImport.length + " entry(ies) for admin review. They'll appear on your ledger once approved. Reloading…";
 commitStatus.className = "status-msg ok";
 setTimeout(function () { window.location.reload(); }, 900);
 } catch (err) {
