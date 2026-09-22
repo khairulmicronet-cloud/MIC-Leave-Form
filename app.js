@@ -12,12 +12,14 @@
   (function populateNameDropdown() {
     const select = $("name");
     if (!select) return;
-    const roster = (typeof LEAVE_FORM_STAFF_NAMES !== "undefined" && Array.isArray(LEAVE_FORM_STAFF_NAMES))
-      ? LEAVE_FORM_STAFF_NAMES : [];
-    roster.forEach((staffName) => {
+    const roster = (typeof LEAVE_FORM_STAFF_ROSTER !== "undefined" && Array.isArray(LEAVE_FORM_STAFF_ROSTER))
+      ? LEAVE_FORM_STAFF_ROSTER : [];
+    roster.forEach((entry) => {
       const opt = document.createElement("option");
-      opt.value = staffName;
-      opt.textContent = staffName;
+      opt.value = entry.full;
+      opt.textContent = entry.full;
+      opt.dataset.short = entry.short;
+      opt.dataset.branch = entry.branch || "";
       select.appendChild(opt);
     });
   })();
@@ -140,8 +142,12 @@
       form.reportValidity();
       return null;
     }
+    const nameSelect = $("name");
+    const selectedOption = nameSelect.selectedOptions && nameSelect.selectedOptions[0];
     return {
-      name: $("name").value.trim(),
+      name: nameSelect.value.trim(),
+      shortName: (selectedOption && selectedOption.dataset.short) || "",
+      branch: (selectedOption && selectedOption.dataset.branch) || "",
       startDate: $("startDate").value,
       startDay: $("startDay").value,
       startTime: $("startTime").value,
@@ -311,7 +317,11 @@
   function buildFilename(data) {
     const startFormatted = formatDateDDMMYYYY(data.startDate);
     const endFormatted = formatDateDDMMYYYY(data.endDate);
-    const shortName = resolveShortName(data.name);
+    // The Name field is always picked from the roster dropdown now, so its
+    // short name rides along as data.shortName — no need to fuzzy-match
+    // the full name against the roster. resolveShortName() is kept only
+    // as a fallback for the unlikely case that's ever missing.
+    const shortName = data.shortName || resolveShortName(data.name);
     return `Leave Form (${startFormatted} to ${endFormatted}) - ${shortName}.docx`;
   }
 
@@ -343,6 +353,28 @@
     return ["Best Regards,", "", name, "", collegeBlock].join("\n");
   }
 
+    // gets their name plus the general College address block only — we
+  // don't have per-staff extension/mobile/email on file, so those lines
+  // are left out rather than guessed or borrowed from someone else.
+  // shortName picks the override (signatureOverrides is keyed by short
+  // name, e.g. "Khairul"); displayName is what's actually printed under
+  // "Best Regards," for anyone without a personal override — their full
+  // name, not just their first name.
+  function buildSignatureBlock(shortName, displayName) {
+    const overrides = (LEAVE_FORM_CONFIG && LEAVE_FORM_CONFIG.signatureOverrides) || {};
+    if (overrides[shortName]) return overrides[shortName];
+    const collegeBlock = (LEAVE_FORM_CONFIG && LEAVE_FORM_CONFIG.genericSignatureCollegeBlock) || "";
+    return ["Best Regards,", "", displayName, "", collegeBlock].join("\n");
+  }
+
+  // CC depends on the applicant's branch (see LEAVE_FORM_STAFF_ROSTER in
+  // config.js): Jerudong staff CC both Sharon and Aqilah, Gadong staff CC
+  // Sharon only. Falls back to the Gadong list if branch is ever unknown.
+  function resolveEmailCc(branch) {
+    const byBranch = (LEAVE_FORM_CONFIG && LEAVE_FORM_CONFIG.emailCcByBranch) || {};
+    return byBranch[branch] || byBranch.Gadong || "";
+  }
+
   async function handleEmail() {
     const data = collectFormData();
     if (!data) { setStatus("Please fill in all required fields.", "error"); return; }
@@ -368,12 +400,12 @@
       "",
       "Thank you.",
       "",
-      buildSignatureBlock(data.name)
+      buildSignatureBlock(data.shortName, data.name)
     ];
     const body = bodyLines.join("\n");
 
     const mailto = `mailto:${encodeURIComponent(LEAVE_FORM_CONFIG.emailTo)}` +
-      `?cc=${encodeURIComponent(LEAVE_FORM_CONFIG.emailCc)}` +
+      `?cc=${encodeURIComponent(resolveEmailCc(data.branch))}` +
       `&subject=${encodeURIComponent(subject)}` +
       `&body=${encodeURIComponent(body)}`;
 
