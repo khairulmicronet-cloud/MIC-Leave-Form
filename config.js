@@ -5,9 +5,18 @@ const LEAVE_FORM_CONFIG = {
   applicantDisplayName: "Awangku Muhammad Khairul Amir Pengiran Darma Putra",
   applicantTitle: "Lecturer",
 
-  // Recipients for the submission email (comma-separate multiple addresses)
+  // Recipient for the submission email — same for everyone.
   emailTo: "maziyyah@micronetbrunei.com",
-  emailCc: "sharon@micronetbrunei.com, aqilah@micronetbrunei.com",
+
+  // CC depends on which branch the applicant belongs to (see "branch" on
+  // each entry in LEAVE_FORM_STAFF_ROSTER below): Jerudong staff CC both
+  // Sharon and Aqilah, Gadong staff CC Sharon only. handleEmail() in
+  // app.js picks the right one for whoever is selected in the Name
+  // dropdown — don't reference a single flat emailCc anywhere else.
+  emailCcByBranch: {
+    Jerudong: "sharon@micronetbrunei.com, aqilah@micronetbrunei.com",
+    Gadong: "sharon@micronetbrunei.com"
+  },
 
   emailGreetingName: "Ms. Maziyyah",
 
@@ -17,11 +26,12 @@ const LEAVE_FORM_CONFIG = {
   // Khairul:
   //   - A name listed here in signatureOverrides gets its full, personal
   //     block (title, direct extension, mobile, email) exactly as before.
-  //   - Any other staff name gets their own name + the general College
-  //     address block below (genericSignatureCollegeBlock) — no personal
-  //     extension/mobile/email, since those aren't on file per staff.
-  // To give another staff member their own full block, add an entry here
-  // keyed by their exact name as it appears in LEAVE_FORM_STAFF_NAMES.
+  //   - Any other staff name gets their own full name + the general
+  //     College address block below (genericSignatureCollegeBlock) — no
+  //     personal extension/mobile/email, since those aren't on file per
+  //     staff.
+  // Keyed by SHORT name (the "short" field in LEAVE_FORM_STAFF_ROSTER
+  // below), not the full name shown in the dropdown.
   // ---------------------------------------------------------------------
   signatureOverrides: {
     "Khairul": [
@@ -32,10 +42,26 @@ const LEAVE_FORM_CONFIG = {
       "",
       "MICRONET INTERNATIONAL COLLEGE",
       "Gadong Campus [Head Office]:",
-      "No. 11 & 12, Kompleks Hj Tahir 2, Sungai Gadong Menglait, BSB BE4119 Brunei Darussalam   P O Box 933 Gadong BE3978",
-      "O: +673-2451133 ext 13    M: +673-7250492    F: +673-2450888",
-      "E: khairul@micronet.com.bn    www.micronet.com.bn"
+      "No. 11 & 12, Kompleks Hj Tahir 2, Sungai Gadong Menglait, BSB BE4119 Brunei Darussalam    P O Box 933 Gadong BE3978",
+      "O: +673-2451133 ext 13        M: +673-7250492    F:  +673-2450888",
+      "E:  khairul@micronet.com.bn       www.micronet.com.bn",
+      "",
+      "Jerudong Branch:",
+      "Unit C8, C9, C10, Complex Jerudong, Simpang 508, Jalan Jerudong, BSB  BG3122 Brunei Darussalam",
+      "O:  +673-2611133",
+      "",
+      "PEARSON BTEC APPROVED CENTRE  |  UTB - MIC COMPUTING DEGREE PROGRAMMES  |",
+      "UTB - SP BRIDGING PROGRAMME IN COMPUTING (BRICOMP)  |  IBTE APPROVED CENTRE"
     ].join("\n")
+    // "Khairul (Test)" is deliberately NOT listed here, and deliberately
+    // NOT in LEAVE_FORM_STAFF_ROSTER either — it falls through to the
+    // generic college block, and it doesn't appear on the public Leave
+    // Application Form dropdown at all (see LEAVE_FORM_STAFF_NAMES
+    // below). It's a temporary staff-role login (PIN 110792) so Khairul
+    // can try the pending-review workflow on the Staff Leave Breakdown
+    // page as a normal staff member would, without touching his real
+    // admin login. Remove it from LEAVE_FORM_STAFF_NAMES below and
+    // delete its StaffAuth row once testing is done.
   },
 
   genericSignatureCollegeBlock: [
@@ -48,41 +74,52 @@ const LEAVE_FORM_CONFIG = {
 };
 
 // ---------------------------------------------------------------------
-// Known staff first names, used to pick the short name in the exported
-// filename: "Leave Form (start to end) - <ShortName>.docx". Whatever the
-// applicant types into the Name field is matched against this list
-// (case-insensitive, matches anywhere in the typed name); the first match
-// is used. Add a new staff member's first name here as they start using
-// the form. If nobody matches, the last word of the typed name is used
-// instead.
+// Staff roster: short name (used internally — StaffAuth login, the
+// review/import backend, signatureOverrides keys, and the exported
+// filename), full legal name (shown in the Leave Application Form's Name
+// dropdown and written into the printed docx + email sign-off), and
+// which branch they're based at (drives the CC list above — see
+// emailCcByBranch). Full names are as listed in Staff Micronet 2026.xlsx.
 //
-// This same list also populates the staff dropdown on the Staff Leave
-// Breakdown page (leave-breakdown.html).
+// This is the single source of truth for the public Leave Application
+// Form (index.html). Add a new staff member here as they start using the
+// form.
 // ---------------------------------------------------------------------
-const LEAVE_FORM_STAFF_NAMES = [
-  "Khairul",
-  "Amal",
-  "Nurlizam",
-  "Lyana",
-  "Veronica",
-  "Hariz",
-  "Aqilah",
-  "Norain",
-  "Maziyah",
-  "Alisha",
-  "Aslam",
-  "Sheraden",
-  "Ummi",
-  "Izzaty",
-  "Azimah",
-  "Nurkhtamal",
-  "Nurzahidah",
-  "Nur Amelea",
-  "Mustadim",
-  "Sharon",
-  "Crisanta",
-  "Kalau"
+const LEAVE_FORM_STAFF_ROSTER = [
+  { short: "Khairul", full: "Awangku Muhammad Khairul Amir Pengiran Darma Putra", branch: "Jerudong" },
+  { short: "Amal", full: "Amal Rafidah bte Haji Hamzah", branch: "Jerudong" },
+  { short: "Nurlizam", full: "Nurlizam bte Pungut/Ismail", branch: "Jerudong" },
+  { short: "Lyana", full: "Lyana Anak Berawoh", branch: "Jerudong" },
+  { short: "Veronica", full: "Veronica Anne binti Roddy", branch: "Jerudong" },
+  { short: "Hariz", full: "Muhammad Hariz Mahyuddin bin Abdullah", branch: "Gadong" },
+  { short: "Aqilah", full: "Hajah Nur' Aqilah binti Haji Ahmad", branch: "Gadong" },
+  { short: "Norain", full: "Norain binti Haji Matusin", branch: "Gadong" },
+  { short: "Maziyah", full: "Siti Fathin Maziyyah Amal Hayati binti Haji Metussin", branch: "Gadong" },
+  { short: "Alisha", full: "Alisha bte Abdul Latip @ Alicecia Jata Anak Latip", branch: "Gadong" },
+  { short: "Aslam", full: "Mohammad Afham Aslam bin Mohd Rajimi", branch: "Gadong" },
+  { short: "Sheraden", full: "Sheraden Lubuguin Mayani", branch: "Gadong" },
+  { short: "Ummi", full: "Dayangku Hajah Ummi Syahirah binti Pengiran Haji Setia Putra", branch: "Gadong" },
+  { short: "Izzaty", full: "Nur Izzaty Faezattul Watiqah binti Haji Hairman", branch: "Gadong" },
+  { short: "Azimah", full: "Azimah binti Mohammad Hishammudin", branch: "Gadong" },
+  { short: "Nurkhtamal", full: "Nurkhtamal binti Alinafiah", branch: "Gadong" },
+  { short: "Nurzahidah", full: "Nurzahidah binti Haji Sahari", branch: "Gadong" },
+  { short: "Nur Amelea", full: "Nur Amelea Batrisyia binti Suhaili", branch: "Jerudong" },
+  { short: "Mustadim", full: "Muhammad Mustadim bin Haji Mohd Lias", branch: "Gadong" },
+  { short: "Sharon", full: "Sharon Chin Lee Fah", branch: "Gadong" },
+  { short: "Crisanta", full: "Crisanta Joveres Dionglay", branch: "Gadong" },
+  { short: "Kalau", full: "Muhammad Nur Aiman bin Abdullah @ Kalau Anak Misen", branch: "Gadong" }
 ];
+
+// ---------------------------------------------------------------------
+// Short names only. Used by the Staff Leave Breakdown page
+// (leave-breakdown.js) to populate the sign-in / "Staff Member" pickers
+// there, and as a fallback in app.js if a name ever needs matching
+// without going through the roster above. Derived from
+// LEAVE_FORM_STAFF_ROSTER, plus "Khairul (Test)" — a temporary
+// staff-role test login that intentionally does NOT appear on the public
+// Leave Application Form (see the comment on it further up).
+// ---------------------------------------------------------------------
+const LEAVE_FORM_STAFF_NAMES = LEAVE_FORM_STAFF_ROSTER.map(function (r) { return r.short; }).concat(["Khairul (Test)"]);
 
 // ---------------------------------------------------------------------
 // Staff Leave Breakdown (leave-breakdown.html) data source.
