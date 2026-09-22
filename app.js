@@ -8,6 +8,20 @@
   const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const TEMPLATE_URL = "assets/leave-form-template.docx";
 
+  // ---- Populate the Name dropdown from the shared staff roster (config.js) ----
+  (function populateNameDropdown() {
+    const select = $("name");
+    if (!select) return;
+    const roster = (typeof LEAVE_FORM_STAFF_NAMES !== "undefined" && Array.isArray(LEAVE_FORM_STAFF_NAMES))
+      ? LEAVE_FORM_STAFF_NAMES : [];
+    roster.forEach((staffName) => {
+      const opt = document.createElement("option");
+      opt.value = staffName;
+      opt.textContent = staffName;
+      select.appendChild(opt);
+    });
+  })();
+
   // Signature / MC attachment state, populated by the file inputs below.
   let signatureImage = null; // { buffer: ArrayBuffer, width, height, ext: "png"|"jpeg" }
   let mcImage = null;        // same shape, or null if not attached
@@ -316,6 +330,19 @@
     return data;
   }
 
+  // Signature sign-off for the "Prepare Submission Email" body. Staff we
+  // have full contact details for (currently just Khairul, in config.js
+  // signatureOverrides) get their complete personal block; anyone else
+  // gets their name plus the general College address block only — we
+  // don't have per-staff extension/mobile/email on file, so those lines
+  // are left out rather than guessed or borrowed from someone else.
+  function buildSignatureBlock(name) {
+    const overrides = (LEAVE_FORM_CONFIG && LEAVE_FORM_CONFIG.signatureOverrides) || {};
+    if (overrides[name]) return overrides[name];
+    const collegeBlock = (LEAVE_FORM_CONFIG && LEAVE_FORM_CONFIG.genericSignatureCollegeBlock) || "";
+    return ["Best Regards,", "", name, "", collegeBlock].join("\n");
+  }
+
   async function handleEmail() {
     const data = collectFormData();
     if (!data) { setStatus("Please fill in all required fields.", "error"); return; }
@@ -341,7 +368,7 @@
       "",
       "Thank you.",
       "",
-      LEAVE_FORM_CONFIG.signatureBlock
+      buildSignatureBlock(data.name)
     ];
     const body = bodyLines.join("\n");
 
