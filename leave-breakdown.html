@@ -133,6 +133,8 @@ create the sheet, deploy the Apps Script API, and paste the resulting URL into
 
 <details class="staff-config-details" id="importDetails">
 <summary>Import leave entries from a spreadsheet (.xlsx)</summary>
+<p class="admin-note" id="importAdminNote" hidden>As an admin, entries you import are added straight to the ledger.</p>
+<p class="admin-note" id="importStaffNote" hidden>Entries you import here go to an admin for review before they count against your balance &mdash; see "Pending" below.</p>
 
 <div class="row">
 <label for="importFile">Spreadsheet file</label>
@@ -182,7 +184,7 @@ fill one in before importing. Uncheck any row you don't want to bring in.
 <tbody id="importPreviewBody"></tbody>
 </table>
 </div>
-<div class="row">
+<div class="row" id="importSetConfigRow">
 <label>
 <input type="checkbox" id="importSetConfig" checked>
 Also set entitlement / carry-forward for this staff &amp; year from the spreadsheet
@@ -194,6 +196,33 @@ Also set entitlement / carry-forward for this staff &amp; year from the spreadsh
 <p id="importCommitStatus" class="status-msg" role="status" aria-live="polite"></p>
 </div>
 </details>
+
+<hr class="section-divider">
+
+<div id="reviewSection">
+<h2 class="admin-heading" id="reviewHeading">Pending Import Entries</h2>
+<p class="admin-note" id="reviewNote">Entries submitted via spreadsheet import that are waiting on review.</p>
+<div class="ledger-table-wrap">
+<table class="ledger-table" id="reviewTable">
+<thead>
+<tr>
+<th>Staff</th>
+<th>Start</th>
+<th>End</th>
+<th>Description</th>
+<th>Annual</th>
+<th>Sick</th>
+<th>Unpaid</th>
+<th>Hosp.</th>
+<th>Submitted</th>
+<th></th>
+</tr>
+</thead>
+<tbody id="reviewBody"></tbody>
+</table>
+</div>
+<p id="reviewEmptyMsg" class="hint" hidden>No pending entries right now.</p>
+</div>
 
 <hr class="section-divider">
 
@@ -254,6 +283,7 @@ Micronet International College &middot; Staff Leave Breakdown
 <script src="config.js"></script>
 <script src="sw-update.js"></script>
 <script src="leave-breakdown.js"></script>
+<script src="leave-review.js"></script>
 <script src="leave-import.js"></script>
 </body>
 </html>
