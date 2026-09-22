@@ -39,6 +39,14 @@ function fmtDays(v) {
   return n === 0 ? "" : String(n);
 }
 
+function fmtTimeRange(from, to) {
+  from = (from || "").trim();
+  to = (to || "").trim();
+  if (!from && !to) return "";
+  if (from && to) return from + " - " + to;
+  return from || to;
+}
+
 async function postAction(payload) {
   const token = window.MIC_AUTH && window.MIC_AUTH.token;
   const withToken = Object.assign({ token: token }, payload);
@@ -90,6 +98,7 @@ function render(pending) {
       "<td>" + escapeHtml(p.Staff || "") + "</td>" +
       "<td>" + escapeHtml(p.StartDate || "") + "</td>" +
       "<td>" + escapeHtml(p.EndDate || "") + "</td>" +
+      "<td>" + escapeHtml(fmtTimeRange(p.TimeFrom, p.TimeTo)) + "</td>" +
       "<td>" + escapeHtml(p.Description || "") + "</td>" +
       "<td>" + fmtDays(p.AnnualDays) + "</td>" +
       "<td>" + fmtDays(p.SickDays) + "</td>" +
