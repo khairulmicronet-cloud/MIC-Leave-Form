@@ -22,13 +22,17 @@
 // signing in with a staff name + PIN (see login_() in the Apps Script
 // backend). Admins (currently Khairul and Maziyah) see and edit every
 // staff member's data. Everyone else gets a read-only view of their own
-// record: adding a leave entry, editing entitlement/carry-forward, and
-// the spreadsheet import are all admin-only now (so only admins tally
-// leave against entitlement — no risk of a duplicate or stray entry
-// entered by the staff member themselves), and those sections are
-// hidden entirely for non-admins (those actions are also blocked
-// server-side, so hiding them here is a UX convenience, not the actual
-// security boundary).
+// record: the "Add a Leave Entry" quick-add form and editing
+// entitlement/carry-forward stay admin-only (so only admins tally leave
+// directly), and those sections are hidden entirely for non-admins
+// (also blocked server-side, so hiding them here is a UX convenience,
+// not the actual boundary).
+//
+// The spreadsheet import is open to every signed-in staff member now: an
+// admin's import lands straight in the ledger as before, but a regular
+// staff member's import goes to a Review queue (PendingEntries on the
+// backend) and only counts once an admin approves it — see
+// leave-review.js and importDetails' role-based wiring below.
 //
 // PIN model: a PIN handed out by an admin is temporary — the first time
 // it's used to sign in, this page forces a "set your own PIN" step
@@ -50,6 +54,9 @@ const STAFF_NAMES = (typeof LEAVE_FORM_STAFF_NAMES !== "undefined" && Array.isAr
 const AUTH_STORAGE_KEY = "micLeaveAuth";
 
 window.MIC_AUTH = { token: null, staff: null, role: null };
+// Lets leave-review.js (approve/reject buttons) refresh the ledger +
+// pending list after a decision, without duplicating the fetch logic.
+window.MIC_ON_REVIEW_CHANGED = null;
 
 const setupNotice = document.getElementById("setupNotice");
 const loginBox = document.getElementById("loginBox");
@@ -80,9 +87,11 @@ const entryStatus = document.getElementById("entryStatus");
 const configStatus = document.getElementById("configStatus");
 const saveConfigBtn = document.getElementById("saveConfigBtn");
 const importDetails = document.getElementById("importDetails");
+const importAdminNote = document.getElementById("importAdminNote");
+const importStaffNote = document.getElementById("importStaffNote");
 const configDetails = document.getElementById("configDetails");
 
-let state = { config: [], entries: [] };
+let state = { config: [], entries: [], pending: [] };
 
 function init() {
 if (!API_URL) {
@@ -267,15 +276,19 @@ sessionLabel.textContent = "Signed in as " + auth.staff +
 (showAdminLabel ? " (admin)" : "") +
 (auth.viaMaster ? " (via master PIN)" : "");
 
-// Admin-only sections: hidden entirely for regular staff. Adding leave
-// entries, editing entitlement/carry-forward, and the spreadsheet import
-// are all admin actions now — only admins tally leave, so staff get a
-// read-only ledger of their own record. The backend also refuses these
-// actions for non-admins, so this is a convenience, not the actual
-// boundary.
+// Admin-only sections: hidden entirely for regular staff. The quick-add
+// entry form and editing entitlement/carry-forward stay admin actions —
+// only admins tally leave directly, so staff get a read-only ledger of
+// their own record. The backend also refuses these actions for
+// non-admins, so this is a convenience, not the actual boundary.
 if (entrySection) entrySection.hidden = !isAdmin;
-if (importDetails) importDetails.hidden = !isAdmin;
 if (configDetails) configDetails.hidden = !isAdmin;
+
+// The spreadsheet import is open to everyone; only the wording (and, in
+// leave-import.js, who it can be imported "as") differs by role.
+if (importDetails) importDetails.hidden = false;
+if (importAdminNote) importAdminNote.hidden = !isAdmin;
+if (importStaffNote) importStaffNote.hidden = isAdmin;
 
 staffSelect.innerHTML = "";
 if (isAdmin) {
@@ -311,6 +324,8 @@ yearSelect.addEventListener("change", render);
 entryForm.addEventListener("submit", onAddEntry);
 saveConfigBtn.addEventListener("click", onSaveConfig);
 
+window.MIC_ON_REVIEW_CHANGED = loadData;
+
 loadData();
 }
 
@@ -328,7 +343,14 @@ StartDate: normalizeDate(e.StartDate),
 EndDate: normalizeDate(e.EndDate)
 });
 });
+state.pending = (data.pending || []).map(function (p) {
+return Object.assign({}, p, {
+StartDate: normalizeDate(p.StartDate),
+EndDate: normalizeDate(p.EndDate)
+});
+});
 render();
+if (window.MIC_RENDER_REVIEW) window.MIC_RENDER_REVIEW(state.pending);
 } catch (err) {
 if (isAuthError(err)) { handleAuthError(); return; }
 ledgerSummary.textContent = "Could not load data: " + err.message;
