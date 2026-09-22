@@ -474,6 +474,7 @@ const tr = document.createElement("tr");
 const dateLabel = e.StartDate === e.EndDate || !e.EndDate ? e.StartDate : (e.StartDate + " to " + e.EndDate);
 tr.innerHTML =
 "<td>" + escapeHtml(dateLabel || "") + "</td>" +
+"<td>" + escapeHtml(fmtTimeRange(e.TimeFrom, e.TimeTo)) + "</td>" +
 "<td>" + escapeHtml(e.Description || "") + "</td>" +
 "<td>" + fmtDays(e.AnnualDays) + "</td>" +
 "<td>" + fmtDays(e.SickDays) + "</td>" +
@@ -505,6 +506,14 @@ ledgerSummary.innerHTML =
 function fmtDays(v) {
 const n = Number(v || 0);
 return n === 0 ? "" : String(n);
+}
+
+function fmtTimeRange(from, to) {
+from = (from || "").trim();
+to = (to || "").trim();
+if (!from && !to) return "";
+if (from && to) return from + " - " + to;
+return from || to;
 }
 
 function escapeHtml(str) {
@@ -545,6 +554,8 @@ staff: currentStaff(),
 startDate: start,
 endDate: end,
 description: desc,
+timeFrom: document.getElementById("entryTimeFrom").value || "",
+timeTo: document.getElementById("entryTimeTo").value || "",
 annualDays: document.getElementById("entryAnnual").value || 0,
 sickDays: document.getElementById("entrySick").value || 0,
 unpaidDays: document.getElementById("entryUnpaid").value || 0,
