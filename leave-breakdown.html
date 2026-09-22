@@ -106,6 +106,14 @@ create the sheet, deploy the Apps Script API, and paste the resulting URL into
 <input type="date" id="entryEnd">
 </div>
 <div class="row">
+<label for="entryTimeFrom">Time From <span class="hint">(optional)</span></label>
+<input type="time" id="entryTimeFrom">
+</div>
+<div class="row">
+<label for="entryTimeTo">Time To <span class="hint">(optional)</span></label>
+<input type="time" id="entryTimeTo">
+</div>
+<div class="row">
 <label for="entryDesc">Description</label>
 <input type="text" id="entryDesc" placeholder="e.g. Travel to KK, Malaysia" required>
 </div>
@@ -209,13 +217,14 @@ Also set entitlement / carry-forward for this staff &amp; year from the spreadsh
 <th>Staff</th>
 <th>Start</th>
 <th>End</th>
+<th>Time</th>
 <th>Description</th>
 <th>Annual</th>
 <th>Sick</th>
 <th>Unpaid</th>
 <th>Hosp.</th>
 <th>Submitted</th>
-<th></th>
+<th>Approvals:</th>
 </tr>
 </thead>
 <tbody id="reviewBody"></tbody>
@@ -232,6 +241,7 @@ Also set entitlement / carry-forward for this staff &amp; year from the spreadsh
 <thead>
 <tr>
 <th>Date</th>
+<th>Time</th>
 <th>Description</th>
 <th>Annual</th>
 <th>Sick</th>
