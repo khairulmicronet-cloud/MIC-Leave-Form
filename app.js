@@ -2,6 +2,18 @@
 (function () {
   "use strict";
 
+  // If this page is restored from the browser's back-forward cache (e.g.
+  // the user clicks "Back" after visiting Staff Leave Breakdown), the DOM
+  // and scripts are NOT re-run — the browser just resurrects whatever was
+  // on screen before navigating away, which can be a stale render (e.g. the
+  // Name dropdown showing short names from an older app.js). Force a full
+  // reload in that case so the page always reflects the current code.
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted) {
+      location.reload();
+    }
+  });
+
   const $ = (id) => document.getElementById(id);
   const statusEl = $("statusMsg");
 
