@@ -53,15 +53,6 @@ const LEAVE_FORM_CONFIG = {
       "PEARSON BTEC APPROVED CENTRE  |  UTB - MIC COMPUTING DEGREE PROGRAMMES  |",
       "UTB - SP BRIDGING PROGRAMME IN COMPUTING (BRICOMP)  |  IBTE APPROVED CENTRE"
     ].join("\n")
-    // "Khairul (Test)" is deliberately NOT listed here, and deliberately
-    // NOT in LEAVE_FORM_STAFF_ROSTER either — it falls through to the
-    // generic college block, and it doesn't appear on the public Leave
-    // Application Form dropdown at all (see LEAVE_FORM_STAFF_NAMES
-    // below). It's a temporary staff-role login (PIN 110792) so Khairul
-    // can try the pending-review workflow on the Staff Leave Breakdown
-    // page as a normal staff member would, without touching his real
-    // admin login. Remove it from LEAVE_FORM_STAFF_NAMES below and
-    // delete its StaffAuth row once testing is done.
   },
 
   genericSignatureCollegeBlock: [
@@ -114,12 +105,9 @@ const LEAVE_FORM_STAFF_ROSTER = [
 // Short names only. Used by the Staff Leave Breakdown page
 // (leave-breakdown.js) to populate the sign-in / "Staff Member" pickers
 // there, and as a fallback in app.js if a name ever needs matching
-// without going through the roster above. Derived from
-// LEAVE_FORM_STAFF_ROSTER, plus "Khairul (Test)" — a temporary
-// staff-role test login that intentionally does NOT appear on the public
-// Leave Application Form (see the comment on it further up).
+// without going through the roster above.
 // ---------------------------------------------------------------------
-const LEAVE_FORM_STAFF_NAMES = LEAVE_FORM_STAFF_ROSTER.map(function (r) { return r.short; }).concat(["Khairul (Test)"]);
+const LEAVE_FORM_STAFF_NAMES = LEAVE_FORM_STAFF_ROSTER.map(function (r) { return r.short; });
 
 // ---------------------------------------------------------------------
 // Staff Leave Breakdown (leave-breakdown.html) data source.
