@@ -84,6 +84,8 @@ const ledgerBody = document.getElementById("ledgerBody");
 const entrySection = document.getElementById("entrySection");
 const entryForm = document.getElementById("entryForm");
 const entryStatus = document.getElementById("entryStatus");
+const entrySubmitBtn = document.getElementById("entrySubmitBtn");
+const entryCancelEditBtn = document.getElementById("entryCancelEditBtn");
 const configStatus = document.getElementById("configStatus");
 const saveConfigBtn = document.getElementById("saveConfigBtn");
 const importDetails = document.getElementById("importDetails");
@@ -92,6 +94,7 @@ const importStaffNote = document.getElementById("importStaffNote");
 const configDetails = document.getElementById("configDetails");
 
 let state = { config: [], entries: [], pending: [] };
+let editingEntryId = null;
 
 function init() {
 if (!API_URL) {
@@ -322,6 +325,7 @@ yearSelect.appendChild(opt);
 staffSelect.addEventListener("change", render);
 yearSelect.addEventListener("change", render);
 entryForm.addEventListener("submit", onAddEntry);
+if (entryCancelEditBtn) entryCancelEditBtn.addEventListener("click", onCancelEdit);
 saveConfigBtn.addEventListener("click", onSaveConfig);
 
 window.MIC_ON_REVIEW_CHANGED = loadData;
@@ -482,10 +486,16 @@ tr.innerHTML =
 "<td>" + fmtDays(e.HospitalizeDays) + "</td>" +
 "<td>" + annualBal + "</td>" +
 "<td>" + sickBal + "</td>" +
-"<td>" + (isAdmin ? '<button type="button" class="btn-link delete-entry" data-id="' + escapeHtml(e.ID) + '">Delete</button>' : "") + "</td>";
+"<td>" + (isAdmin ?
+'<button type="button" class="btn-link edit-entry" data-id="' + escapeHtml(e.ID) + '">Edit</button> ' +
+'<button type="button" class="btn-link delete-entry" data-id="' + escapeHtml(e.ID) + '">Delete</button>'
+: "") + "</td>";
 ledgerBody.appendChild(tr);
 });
 
+ledgerBody.querySelectorAll(".edit-entry").forEach(function (btn) {
+btn.addEventListener("click", function () { onEditEntry(btn.getAttribute("data-id")); });
+});
 ledgerBody.querySelectorAll(".delete-entry").forEach(function (btn) {
 btn.addEventListener("click", function () { onDeleteEntry(btn.getAttribute("data-id")); });
 });
@@ -538,7 +548,8 @@ return data;
 
 async function onAddEntry(ev) {
 ev.preventDefault();
-entryStatus.textContent = "Saving…";
+const isEdit = !!editingEntryId;
+entryStatus.textContent = isEdit ? "Saving changes…" : "Saving…";
 entryStatus.className = "status-msg";
 try {
 const start = document.getElementById("entryStart").value;
@@ -547,10 +558,7 @@ const end = document.getElementById("entryEnd").value || start;
 const desc = document.getElementById("entryDesc").value.trim();
 if (!desc) throw new Error("Description is required.");
 
-await postAction({
-action: "addEntry",
-entry: {
-staff: currentStaff(),
+const entryPayload = {
 startDate: start,
 endDate: end,
 description: desc,
@@ -560,11 +568,20 @@ annualDays: document.getElementById("entryAnnual").value || 0,
 sickDays: document.getElementById("entrySick").value || 0,
 unpaidDays: document.getElementById("entryUnpaid").value || 0,
 hospitalizeDays: document.getElementById("entryHospitalize").value || 0
+};
+
+if (isEdit) {
+await postAction({ action: "editEntry", id: editingEntryId, entry: entryPayload });
+} else {
+entryPayload.staff = currentStaff();
+await postAction({ action: "addEntry", entry: entryPayload });
 }
-});
 
 entryForm.reset();
-entryStatus.textContent = "Entry added.";
+editingEntryId = null;
+entrySubmitBtn.textContent = "+ Add Entry";
+if (entryCancelEditBtn) entryCancelEditBtn.hidden = true;
+entryStatus.textContent = isEdit ? "Entry updated." : "Entry added.";
 entryStatus.className = "status-msg ok";
 await loadData();
 } catch (err) {
@@ -572,6 +589,35 @@ if (isAuthError(err)) { handleAuthError(); return; }
 entryStatus.textContent = "Error: " + err.message;
 entryStatus.className = "status-msg error";
 }
+}
+
+function onEditEntry(id) {
+const entry = state.entries.find(function (en) { return en.ID === id; });
+if (!entry) return;
+editingEntryId = id;
+document.getElementById("entryStart").value = entry.StartDate || "";
+document.getElementById("entryEnd").value = entry.EndDate || "";
+document.getElementById("entryTimeFrom").value = entry.TimeFrom || "";
+document.getElementById("entryTimeTo").value = entry.TimeTo || "";
+document.getElementById("entryDesc").value = entry.Description || "";
+document.getElementById("entryAnnual").value = entry.AnnualDays || 0;
+document.getElementById("entrySick").value = entry.SickDays || 0;
+document.getElementById("entryUnpaid").value = entry.UnpaidDays || 0;
+document.getElementById("entryHospitalize").value = entry.HospitalizeDays || 0;
+entrySubmitBtn.textContent = "Save Changes";
+if (entryCancelEditBtn) entryCancelEditBtn.hidden = false;
+entryStatus.textContent = "Editing this entry — update the fields above and Save Changes, or Cancel Edit.";
+entryStatus.className = "status-msg";
+entrySection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function onCancelEdit() {
+editingEntryId = null;
+entryForm.reset();
+entrySubmitBtn.textContent = "+ Add Entry";
+if (entryCancelEditBtn) entryCancelEditBtn.hidden = true;
+entryStatus.textContent = "";
+entryStatus.className = "status-msg";
 }
 
 async function onDeleteEntry(id) {
