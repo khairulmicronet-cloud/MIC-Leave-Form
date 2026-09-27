@@ -68,37 +68,47 @@ const LEAVE_FORM_CONFIG = {
 // Staff roster: short name (used internally — StaffAuth login, the
 // review/import backend, signatureOverrides keys, and the exported
 // filename), full legal name (shown in the Leave Application Form's Name
-// dropdown and written into the printed docx + email sign-off), and
-// which branch they're based at (drives the CC list above — see
-// emailCcByBranch). Full names are as listed in Staff Micronet 2026.xlsx.
+// dropdown and written into the printed docx + email sign-off), which
+// branch they're based at (drives the CC list above — see
+// emailCcByBranch), and their role, which drives the Annual Leave
+// accrual schedule on the Staff Leave Breakdown page (see
+// ANNUAL_ACCRUAL_SHAPES in leave-breakdown.js):
+//   - "lecturer"    — +1 day/month Jan–Sep, +2 day/month Oct–Dec (15/yr)
+//   - "admin"       — +1 day/month Jan–Oct, +2 day/month Nov–Dec (14/yr)
+//   - "gm"          — +1 day/month Jan–May, +2 day/month Jun–Dec (19/yr),
+//                     currently just Sharon (General Manager)
+//   - "part-timer"  — no annual leave accrual; the form is used purely
+//                     as a formality for this person (currently
+//                     Veronica)
+// Full names are as listed in Staff Micronet 2026.xlsx.
 //
 // This is the single source of truth for the public Leave Application
 // Form (index.html). Add a new staff member here as they start using the
 // form.
 // ---------------------------------------------------------------------
 const LEAVE_FORM_STAFF_ROSTER = [
-  { short: "Khairul", full: "Awangku Muhammad Khairul Amir Pengiran Darma Putra", branch: "Jerudong" },
-  { short: "Amal", full: "Amal Rafidah bte Haji Hamzah", branch: "Jerudong" },
-  { short: "Nurlizam", full: "Nurlizam bte Pungut/Ismail", branch: "Jerudong" },
-  { short: "Lyana", full: "Lyana Anak Berawoh", branch: "Jerudong" },
-  { short: "Veronica", full: "Veronica Anne binti Roddy", branch: "Jerudong" },
-  { short: "Hariz", full: "Muhammad Hariz Mahyuddin bin Abdullah", branch: "Gadong" },
-  { short: "Aqilah", full: "Hajah Nur' Aqilah binti Haji Ahmad", branch: "Gadong" },
-  { short: "Norain", full: "Norain binti Haji Matusin", branch: "Gadong" },
-  { short: "Maziyah", full: "Siti Fathin Maziyyah Amal Hayati binti Haji Metussin", branch: "Gadong" },
-  { short: "Alisha", full: "Alisha bte Abdul Latip @ Alicecia Jata Anak Latip", branch: "Gadong" },
-  { short: "Aslam", full: "Mohammad Afham Aslam bin Mohd Rajimi", branch: "Gadong" },
-  { short: "Sheraden", full: "Sheraden Lubuguin Mayani", branch: "Gadong" },
-  { short: "Ummi", full: "Dayangku Hajah Ummi Syahirah binti Pengiran Haji Setia Putra", branch: "Gadong" },
-  { short: "Izzaty", full: "Nur Izzaty Faezattul Watiqah binti Haji Hairman", branch: "Gadong" },
-  { short: "Azimah", full: "Azimah binti Mohammad Hishammudin", branch: "Gadong" },
-  { short: "Nurkhtamal", full: "Nurkhtamal binti Alinafiah", branch: "Gadong" },
-  { short: "Nurzahidah", full: "Nurzahidah binti Haji Sahari", branch: "Gadong" },
-  { short: "Nur Amelea", full: "Nur Amelea Batrisyia binti Suhaili", branch: "Jerudong" },
-  { short: "Mustadim", full: "Muhammad Mustadim bin Haji Mohd Lias", branch: "Gadong" },
-  { short: "Sharon", full: "Sharon Chin Lee Fah", branch: "Gadong" },
-  { short: "Crisanta", full: "Crisanta Joveres Dionglay", branch: "Gadong" },
-  { short: "Kalau", full: "Muhammad Nur Aiman bin Abdullah @ Kalau Anak Misen", branch: "Gadong" }
+  { short: "Khairul", full: "Awangku Muhammad Khairul Amir Pengiran Darma Putra", branch: "Jerudong", role: "lecturer" },
+  { short: "Amal", full: "Amal Rafidah bte Haji Hamzah", branch: "Jerudong", role: "lecturer" },
+  { short: "Nurlizam", full: "Nurlizam bte Pungut/Ismail", branch: "Jerudong", role: "lecturer" },
+  { short: "Lyana", full: "Lyana Anak Berawoh", branch: "Jerudong", role: "lecturer" },
+  { short: "Veronica", full: "Veronica Anne binti Roddy", branch: "Jerudong", role: "part-timer" },
+  { short: "Hariz", full: "Muhammad Hariz Mahyuddin bin Abdullah", branch: "Gadong", role: "lecturer" },
+  { short: "Aqilah", full: "Hajah Nur' Aqilah binti Haji Ahmad", branch: "Gadong", role: "admin" },
+  { short: "Norain", full: "Norain binti Haji Matusin", branch: "Gadong", role: "admin" },
+  { short: "Maziyah", full: "Siti Fathin Maziyyah Amal Hayati binti Haji Metussin", branch: "Gadong", role: "admin" },
+  { short: "Alisha", full: "Alisha bte Abdul Latip @ Alicecia Jata Anak Latip", branch: "Gadong", role: "lecturer" },
+  { short: "Aslam", full: "Mohammad Afham Aslam bin Mohd Rajimi", branch: "Gadong", role: "admin" },
+  { short: "Sheraden", full: "Sheraden Lubuguin Mayani", branch: "Gadong", role: "lecturer" },
+  { short: "Ummi", full: "Dayangku Hajah Ummi Syahirah binti Pengiran Haji Setia Putra", branch: "Gadong", role: "admin" },
+  { short: "Izzaty", full: "Nur Izzaty Faezattul Watiqah binti Haji Hairman", branch: "Gadong", role: "lecturer" },
+  { short: "Azimah", full: "Azimah binti Mohammad Hishammudin", branch: "Gadong", role: "lecturer" },
+  { short: "Nurkhtamal", full: "Nurkhtamal binti Alinafiah", branch: "Gadong", role: "admin" },
+  { short: "Nurzahidah", full: "Nurzahidah binti Haji Sahari", branch: "Gadong", role: "admin" },
+  { short: "Nur Amelea", full: "Nur Amelea Batrisyia binti Suhaili", branch: "Jerudong", role: "admin" },
+  { short: "Mustadim", full: "Muhammad Mustadim bin Haji Mohd Lias", branch: "Gadong", role: "lecturer" },
+  { short: "Sharon", full: "Sharon Chin Lee Fah", branch: "Gadong", role: "gm" },
+  { short: "Crisanta", full: "Crisanta Joveres Dionglay", branch: "Gadong", role: "lecturer" },
+  { short: "Kalau", full: "Muhammad Nur Aiman bin Abdullah @ Kalau Anak Misen", branch: "Gadong", role: "admin" }
 ];
 
 // ---------------------------------------------------------------------
