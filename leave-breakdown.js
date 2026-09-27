@@ -412,39 +412,69 @@ return e.Staff === staff && (e.StartDate || "").slice(0, 4) === String(year);
 .sort(function (a, b) { return (a.StartDate || "").localeCompare(b.StartDate || ""); });
 }
 
+// Per-role monthly release shape: how many "shares" of the Annual Leave
+// entitlement release on the 1st of each month (index 0 = Jan … 11 =
+// Dec). The shape's total is the number of shares a full-year
+// entitlement is divided into for that role — e.g. an Admin's
+// configured entitlement releases across 14 shares, a Lecturer's across
+// 15, matching how Micronet actually paces each role's leave through
+// the year (roles were confirmed with Maziyah, Sept 2026). A
+// part-timer has no accrual at all — the form is used purely as a
+// formality for them.
+const ANNUAL_ACCRUAL_SHAPES = {
+admin: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2], // 14 shares/yr: +1 Jan–Oct, +2 Nov–Dec
+lecturer: [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2], // 15 shares/yr: +1 Jan–Sep, +2 Oct–Dec
+gm: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2], // 19 shares/yr: +1 Jan–May, +2 Jun–Dec
+"part-timer": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] // no accrual
+};
+
+// Human-readable version of each shape above, shown under the Annual
+// Leave Balance for the current year. Keep this in sync with
+// ANNUAL_ACCRUAL_SHAPES if the schedule ever changes.
+const ANNUAL_ACCRUAL_HINTS = {
+admin: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–Oct), 2 days on the 1st of each month (Nov–Dec).",
+lecturer: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–Sep), 2 days on the 1st of each month (Oct–Dec).",
+gm: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–May), 2 days on the 1st of each month (Jun–Dec).",
+"part-timer": "No annual leave accrual applies — this form is used for record purposes only."
+};
+
+// Looks up a staff member's role from the roster in config.js.
+// Defaults to "lecturer" if the roster has no role set (or the staff
+// name isn't found), so an unconfigured entry fails safe to the most
+// common schedule rather than accruing nothing.
+function roleFor(staff) {
+const entry = LEAVE_FORM_STAFF_ROSTER.find(function (r) { return r.short === staff; });
+return (entry && entry.role) || "lecturer";
+}
+
 // How much of a staff member's Annual Leave entitlement has actually
 // been released as of `asOf`, for the given `year`:
 //   - a year already in the past is fully accrued (the whole entitlement)
 //   - a year not yet started hasn't accrued anything
-//   - the current year accrues progressively: 1 "share" released on the
-//     1st of each month Jan–Oct, 2 shares on 1 Nov, 2 shares on 1 Dec,
-//     and 1 more share on 31 Dec (15 shares total, matching a 15-day
-//     entitlement). A different configured entitlement scales every
-//     share proportionally, e.g. a 12-day entitlement releases 12/15 of
-//     a share at each of the same release points.
-function accruedAnnual(entitlement, year, asOf) {
+//   - the current year accrues progressively, released on the 1st of
+//     each month according to that staff's role-based shape above. A
+//     configured entitlement scales every share proportionally, e.g. an
+//     Admin's 12-day entitlement releases 12/14 of a share at each of
+//     the 14 release points in their shape.
+function accruedAnnual(entitlement, year, asOf, role) {
 const e = Number(entitlement) || 0;
 const y = Number(year);
 const currentYear = asOf.getFullYear();
 if (y < currentYear) return e;
 if (y > currentYear) return 0;
 
-const sharesPerDay = e / 15;
+const shape = ANNUAL_ACCRUAL_SHAPES[role] || ANNUAL_ACCRUAL_SHAPES.lecturer;
+const totalShares = shape.reduce(function (a, b) { return a + b; }, 0);
+if (totalShares === 0) return 0;
+const sharesPerDay = e / totalShares;
+
 const month = asOf.getMonth(); // 0 = Jan … 11 = Dec
-const day = asOf.getDate();
 let shares = 0;
-for (let m = 0; m <= month; m++) {
-if (m <= 9) { // Jan–Oct
-shares += 1;
-} else if (m === 10) { // Nov
-shares += 2;
-} else { // Dec
-shares += 2;
-if (day >= 31) shares += 1;
-}
-}
-// Round to the nearest half-day for a clean display; exact for the
-// default 15-day schedule, a close approximation for any other total.
+for (let m = 0; m <= month; m++) shares += shape[m];
+
+// Round to the nearest half-day for a clean display; exact for a
+// role's default entitlement (14/15/19), a close approximation for any
+// other configured total.
 return Math.round(shares * sharesPerDay * 2) / 2;
 }
 
@@ -462,7 +492,7 @@ document.getElementById("cfgAnnualCarryForward").value = cfg.AnnualCarryForward 
 document.getElementById("cfgSickEntitlement").value = cfg.SickEntitlement || 0;
 document.getElementById("cfgSickCarryForward").value = cfg.SickCarryForward || 0;
 
-let annualBal = Number(cfg.AnnualCarryForward || 0) + accruedAnnual(cfg.AnnualEntitlement, year, new Date());
+let annualBal = Number(cfg.AnnualCarryForward || 0) + accruedAnnual(cfg.AnnualEntitlement, year, new Date(), roleFor(staff));
 let sickBal = Number(cfg.SickCarryForward || 0) + Number(cfg.SickEntitlement || 0);
 let unpaidTotal = 0;
 let hospitalizeTotal = 0;
@@ -501,7 +531,7 @@ btn.addEventListener("click", function () { onDeleteEntry(btn.getAttribute("data
 });
 
 const annualNote = String(year) === String(new Date().getFullYear())
-? "<p class=\"hint\">Annual leave accrues monthly: 1 day on the 1st of each month (Jan–Oct), 2 days on 1 Nov, 2 days on 1 Dec, plus 1 more on 31 Dec.</p>"
+? "<p class=\"hint\">" + (ANNUAL_ACCRUAL_HINTS[roleFor(staff)] || ANNUAL_ACCRUAL_HINTS.lecturer) + "</p>"
 : "";
 
 ledgerSummary.innerHTML =
