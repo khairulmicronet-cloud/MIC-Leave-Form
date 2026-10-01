@@ -1,4 +1,4 @@
-const CACHE_NAME = "leave-form-cache-v17";
+const CACHE_NAME = "leave-form-cache-v18";
 const ASSETS = [
   "./",
   "./index.html",
@@ -15,7 +15,8 @@ const ASSETS = [
   "./assets/leave-form-template.docx",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
+  "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
+  "https://cdn.jsdelivr.net/npm/docx-preview@0.4.1/dist/docx-preview.min.js"
 ];
 
 self.addEventListener("install", (event) => {
