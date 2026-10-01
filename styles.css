@@ -330,3 +330,90 @@ body {
 [hidden] {
   display: none !important;
 }
+
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 20, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.preview-dialog {
+  background: #fff;
+  width: 100%;
+  max-width: 820px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+.preview-header h2 {
+  font-size: 1rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-close {
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #555;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.preview-close:hover { color: #000; }
+
+.preview-loading {
+  padding: 24px 16px;
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.preview-body {
+  overflow: auto;
+  padding: 16px;
+  background: #e9eaed;
+  flex: 1 1 auto;
+}
+.preview-body .docx-wrapper {
+  background: transparent;
+  padding: 0;
+}
+.preview-body section.docx {
+  margin: 0 auto 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.preview-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-top: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+.preview-actions .btn { flex: 1 1 220px; }
+
+#previewStatusMsg {
+  margin: 0 16px 12px;
+}
