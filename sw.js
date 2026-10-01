@@ -1,4 +1,4 @@
-const CACHE_NAME = "leave-form-cache-v16";
+const CACHE_NAME = "leave-form-cache-v17";
 const ASSETS = [
   "./",
   "./index.html",
