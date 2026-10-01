@@ -517,6 +517,129 @@
     return byBranch[branch] || byBranch.Gadong || "";
   }
 
+  // ---- Build the email subject/body/mailto for a given generated document.
+  // Shared by both hand-off paths below (native Share, and the old
+  // download-then-mailto fallback) so the two stay in sync.
+  function buildEmailContent(data, filename) {
+    const subject = filename.replace(/\.docx$/i, "");
+    const bodyLines = [
+      `Dear ${LEAVE_FORM_CONFIG.emailGreetingName},`,
+      "",
+      `This is the leave form attached for my leave on ${formatDateLong(data.startDate)}, ${data.startDay} until ${formatDateLong(data.endDate)}, ${data.endDay}. If you do have any query, please do ask me.`,
+      "",
+      "Thank you.",
+      "",
+      buildSignatureBlock(data.shortName, data.name)
+    ];
+    const body = bodyLines.join("\n");
+    const mailto = `mailto:${encodeURIComponent(LEAVE_FORM_CONFIG.emailTo)}` +
+      `?cc=${encodeURIComponent(resolveEmailCc(data.branch))}` +
+      `&subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`;
+    return { subject, body, mailto };
+  }
+
+  // Web Share API (with a file) lets the OS share sheet hand the document
+  // straight to Gmail/Outlook/WhatsApp etc. as a real attachment — no
+  // Downloads-folder detour. Only some mobile browsers support sharing
+  // files this way, so this is feature-detected per file, and the
+  // download+mailto fallback below always stays available too.
+  function canShareFile(file) {
+    try {
+      return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function hideDocPreview() {
+    const overlay = $("previewOverlay");
+    overlay.hidden = true;
+    $("previewBody").innerHTML = "";
+    const statusEl = $("previewStatusMsg");
+    statusEl.textContent = "";
+    statusEl.className = "status-msg";
+  }
+
+  function finalizeDownloadAndEmail(blob, filename, data) {
+    downloadBlob(blob, filename);
+    const { mailto } = buildEmailContent(data, filename);
+    setStatus(`Downloaded "${filename}" — your email app is opening. Attach that file before sending.`, "ok");
+    clearDraft();
+    hideDocPreview();
+    window.location.href = mailto;
+  }
+
+  async function finalizeShare(blob, filename, data) {
+    const mime = blob.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const file = new File([blob], filename, { type: mime });
+    const { subject, body } = buildEmailContent(data, filename);
+    const previewStatus = $("previewStatusMsg");
+    try {
+      await navigator.share({ files: [file], title: subject, text: body });
+      setStatus(`Shared "${filename}" — finish sending it from the app you picked.`, "ok");
+      clearDraft();
+      hideDocPreview();
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        // User backed out of the share sheet — leave the preview open and
+        // the draft intact so they can just try again.
+        return;
+      }
+      console.error(err);
+      previewStatus.textContent = "Could not share the document: " + err.message;
+      previewStatus.className = "status-msg error";
+    }
+  }
+
+  // Shows the generated .docx rendered on-page (via docx-preview) before the
+  // person commits to downloading or sharing it, so they can check it looks
+  // right first. Rendering is best-effort: if the preview library fails for
+  // any reason, the actual document is still fine and both action buttons
+  // still work — only the visual preview itself is skipped.
+  function showDocPreview(blob, filename, data) {
+    const overlay = $("previewOverlay");
+    const loading = $("previewLoading");
+    const body = $("previewBody");
+    const shareBtn = $("previewShareBtn");
+    const downloadBtn = $("previewDownloadBtn");
+    const closeBtn = $("previewCloseBtn");
+    const statusEl = $("previewStatusMsg");
+
+    $("previewFilename").textContent = filename;
+    statusEl.textContent = "";
+    statusEl.className = "status-msg";
+    body.innerHTML = "";
+    loading.hidden = false;
+    overlay.hidden = false;
+
+    const mime = blob.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const file = new File([blob], filename, { type: mime });
+    shareBtn.hidden = !canShareFile(file);
+
+    shareBtn.onclick = () => finalizeShare(blob, filename, data);
+    downloadBtn.onclick = () => finalizeDownloadAndEmail(blob, filename, data);
+    closeBtn.onclick = () => hideDocPreview();
+
+    if (typeof docx === "undefined" || !docx.renderAsync) {
+      loading.hidden = true;
+      body.innerHTML = '<p style="padding:16px;color:#666;">Preview isn\'t available right now, but your document was generated fine — use the buttons below.</p>';
+      return;
+    }
+
+    blob.arrayBuffer()
+      .then((buf) => docx.renderAsync(buf, body, body))
+      .then(() => { loading.hidden = true; })
+      .catch((err) => {
+        console.error(err);
+        loading.hidden = true;
+        body.innerHTML = '<p style="padding:16px;color:#666;">Could not render a preview, but your document was generated fine — use the buttons below.</p>';
+      });
+  }
+
+  // "Prepare Submission Email" now builds the document itself (no need to
+  // press "Download Filled Form" first) and shows a preview before handing
+  // it off, rather than silently downloading and jumping to the email app.
   async function handleEmail() {
     const data = collectFormData();
     if (!data) { setStatus("Please fill in all required fields.", "error"); return; }
@@ -531,33 +654,20 @@
       return;
     }
     const filename = buildFilename(data);
-    downloadBlob(blob, filename);
-
-    const subject = filename.replace(/\.docx$/i, "");
-
-    const bodyLines = [
-      `Dear ${LEAVE_FORM_CONFIG.emailGreetingName},`,
-      "",
-      `This is the leave form attached for my leave on ${formatDateLong(data.startDate)}, ${data.startDay} until ${formatDateLong(data.endDate)}, ${data.endDay}. If you do have any query, please do ask me.`,
-      "",
-      "Thank you.",
-      "",
-      buildSignatureBlock(data.shortName, data.name)
-    ];
-    const body = bodyLines.join("\n");
-
-    const mailto = `mailto:${encodeURIComponent(LEAVE_FORM_CONFIG.emailTo)}` +
-      `?cc=${encodeURIComponent(resolveEmailCc(data.branch))}` +
-      `&subject=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(body)}`;
-
-    setStatus(`Downloaded "${filename}" — your email app is opening. Attach that file before sending.`, "ok");
-    clearDraft();
-    window.location.href = mailto;
+    setStatus("");
+    showDocPreview(blob, filename, data);
+    return data;
   }
 
   $("downloadBtn").addEventListener("click", handleDownload);
   $("emailBtn").addEventListener("click", handleEmail);
+
+  $("previewOverlay").addEventListener("click", (e) => {
+    if (e.target === $("previewOverlay")) hideDocPreview();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("previewOverlay").hidden) hideDocPreview();
+  });
 
   // ---- PWA: service worker registration + auto-update now live in
   // sw-update.js (shared by every page) ----
