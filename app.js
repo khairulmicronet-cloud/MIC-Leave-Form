@@ -20,6 +20,133 @@
   const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const TEMPLATE_URL = "assets/leave-form-template.docx";
 
+  // ---------------------------------------------------------------------
+  // Draft autosave: on mobile, "Download Filled Form" leaves the page (the
+  // browser opens its own file preview/share sheet to hand off the .docx),
+  // and coming back via "Back" triggers the pageshow/persisted reload
+  // above — which wipes every field the person just filled in, right
+  // before they'd want to press "Prepare Submission Email" with the same
+  // details. To fix that without giving up the reload (still needed to
+  // avoid stale code), every field is saved to localStorage as it's typed
+  // and silently restored the moment the page (re)loads, so Download →
+  // Back → Prepare Submission Email keeps the same data. The draft is
+  // cleared once an email is successfully prepared (that leave request is
+  // done) and expires on its own after a day, so returning to this page
+  // long after abandoning a form doesn't resurrect a stale, confusing fill.
+  // ---------------------------------------------------------------------
+  const DRAFT_KEY = "micLeaveFormDraft";
+  const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const DRAFT_IMAGE_MAX_BYTES = 1.5 * 1024 * 1024; // skip persisting an image above this size
+  const DRAFT_FIELD_IDS = [
+    "name", "startDate", "startDay", "startTime",
+    "endDate", "endDay", "endTime",
+    "resumeDate", "resumeDay", "resumeTime",
+    "daysApplied", "reason", "address", "telephone", "sigDate"
+  ];
+
+  function bufferToBase64(buffer) {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  }
+
+  function base64ToBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  function saveDraft() {
+    try {
+      const draft = { savedAt: Date.now(), fields: {} };
+      DRAFT_FIELD_IDS.forEach((id) => {
+        const el = $(id);
+        if (el) draft.fields[id] = el.value;
+      });
+      if (signatureImage && signatureImage.buffer.byteLength <= DRAFT_IMAGE_MAX_BYTES) {
+        draft.signature = {
+          base64: bufferToBase64(signatureImage.buffer),
+          width: signatureImage.width, height: signatureImage.height, ext: signatureImage.ext
+        };
+      }
+      if (mcImage && mcImage.buffer.byteLength <= DRAFT_IMAGE_MAX_BYTES) {
+        draft.mc = {
+          base64: bufferToBase64(mcImage.buffer),
+          width: mcImage.width, height: mcImage.height, ext: mcImage.ext
+        };
+      }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (e) {
+      // Storage unavailable, over quota, or private browsing — the typed
+      // fields just won't survive a reload; nothing else to do here.
+    }
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+  }
+
+  function restoreImagePreview(payload, previewId) {
+    const mime = payload.ext === "png" ? "image/png" : "image/jpeg";
+    const buffer = base64ToBuffer(payload.base64);
+    const blob = new Blob([buffer], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const preview = $(previewId);
+    preview.src = url;
+    preview.hidden = false;
+    return { buffer, width: payload.width, height: payload.height, ext: payload.ext };
+  }
+
+  function restoreDraft() {
+    let raw;
+    try {
+      raw = localStorage.getItem(DRAFT_KEY);
+    } catch (e) {
+      return;
+    }
+    if (!raw) return;
+    let draft;
+    try {
+      draft = JSON.parse(raw);
+    } catch (e) {
+      clearDraft();
+      return;
+    }
+    if (!draft || !draft.fields || typeof draft.savedAt !== "number" ||
+      Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) {
+      clearDraft();
+      return;
+    }
+
+    DRAFT_FIELD_IDS.forEach((id) => {
+      const el = $(id);
+      if (el && draft.fields[id] !== undefined) el.value = draft.fields[id];
+    });
+
+    if (draft.signature) {
+      try { signatureImage = restoreImagePreview(draft.signature, "signaturePreview"); }
+      catch (e) { signatureImage = null; }
+    }
+    if (draft.mc) {
+      try { mcImage = restoreImagePreview(draft.mc, "mcPreview"); }
+      catch (e) { mcImage = null; }
+    }
+  }
+
+  function wireDraftAutosave() {
+    DRAFT_FIELD_IDS.forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      const evt = (el.tagName === "SELECT" || el.type === "date" || el.type === "time") ? "change" : "input";
+      el.addEventListener(evt, saveDraft);
+    });
+  }
+
   // ---- Populate the Name dropdown from the shared staff roster (config.js) ----
   (function populateNameDropdown() {
     const select = $("name");
@@ -140,12 +267,15 @@
   }
 
   wireImageUpload("signature", "signaturePreview",
-    (img) => { signatureImage = img; },
-    () => { signatureImage = null; });
+    (img) => { signatureImage = img; saveDraft(); },
+    () => { signatureImage = null; saveDraft(); });
 
   wireImageUpload("mcAttachment", "mcPreview",
-    (img) => { mcImage = img; },
-    () => { mcImage = null; });
+    (img) => { mcImage = img; saveDraft(); },
+    () => { mcImage = null; saveDraft(); });
+
+  wireDraftAutosave();
+  restoreDraft();
 
   // ---- Collect + validate form data ----
   function collectFormData() {
@@ -422,6 +552,7 @@
       `&body=${encodeURIComponent(body)}`;
 
     setStatus(`Downloaded "${filename}" — your email app is opening. Attach that file before sending.`, "ok");
+    clearDraft();
     window.location.href = mailto;
   }
 
