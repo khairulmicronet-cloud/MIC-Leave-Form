@@ -126,7 +126,24 @@
   </footer>
 </div>
 
+<div id="previewOverlay" class="preview-overlay" hidden>
+  <div class="preview-dialog">
+    <div class="preview-header">
+      <h2>Preview &mdash; <span id="previewFilename"></span></h2>
+      <button type="button" id="previewCloseBtn" class="preview-close" aria-label="Close preview">&times;</button>
+    </div>
+    <div id="previewLoading" class="preview-loading">Rendering preview&hellip;</div>
+    <div id="previewBody" class="preview-body"></div>
+    <div class="preview-actions">
+      <button type="button" id="previewShareBtn" class="btn primary" hidden>📤 Share / Attach to Email App</button>
+      <button type="button" id="previewDownloadBtn" class="btn secondary">⬇ Download &amp; Open Email App</button>
+    </div>
+    <p id="previewStatusMsg" class="status-msg" role="status" aria-live="polite"></p>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.4.1/dist/docx-preview.min.js"></script>
 <script src="config.js"></script>
 <script src="sw-update.js"></script>
 <script src="app.js"></script>
