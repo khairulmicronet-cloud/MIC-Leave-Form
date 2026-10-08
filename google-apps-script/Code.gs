@@ -85,9 +85,9 @@ const TIMESTAMP_FIELDS = ["CreatedAt"];
 // projects and the GitHub-hosted web app are separate JS environments,
 // so this list can't be shared automatically between them).
 const ALL_STAFF_NAMES = [
-  "Khairul", "Amal", "Nurlizam", "Lyana", "Veronica", "Hariz",
+  "Khairul", "Amal", "Nurlizam", "Lyana", "Veronica",
   "Aqilah", "Norain", "Maziyah", "Alisha", "Aslam", "Sheraden",
-  "Ummi", "Izzaty", "Azimah", "Nurkhtamal", "Nurzahidah", "Nur Amelea",
+  "Ummi", "Izzaty", "Azimah", "Nurkhtamal", "Nurzahidah",
   "Mustadim", "Sharon", "Crisanta", "Kalau"
 ];
 
