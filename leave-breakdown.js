@@ -10,12 +10,12 @@
 //
 // Running balances are computed here in the browser. Sick balance is a
 // flat pool (carry-forward + entitlement − used). Annual balance accrues
-// monthly instead of being available in full on 1 January: 1 day is
-// released on the 1st of each month (Jan–Oct), 2 days on 1 Nov, 2 days
-// on 1 Dec, plus 1 more on 31 Dec — 15 "shares" total for a staff member
-// on the default 15-day entitlement. A different configured entitlement
-// scales every release proportionally (see accruedAnnual() below).
-// Unpaid/Hospitalize have no entitlement, they're just running totals.
+// monthly instead of being available in full on 1 January, on a schedule
+// that varies by role (Admin, Lecturer, GM, part-timer) — see
+// ANNUAL_ACCRUAL_SHAPES below for the exact per-month release for each
+// role. A configured entitlement scales every release proportionally
+// (see accruedAnnual() below). Unpaid/Hospitalize have no entitlement,
+// they're just running totals.
 //
 // Access control:
 // Every request to the backend must carry a signed token obtained by
@@ -422,8 +422,8 @@ return e.Staff === staff && (e.StartDate || "").slice(0, 4) === String(year);
 // part-timer has no accrual at all — the form is used purely as a
 // formality for them.
 const ANNUAL_ACCRUAL_SHAPES = {
-admin: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2], // 14 shares/yr: +1 Jan–Oct, +2 Nov–Dec
-lecturer: [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2], // 15 shares/yr: +1 Jan–Sep, +2 Oct–Dec
+admin: [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], // 14 shares/yr: +2 Jan, +1 Feb–Nov, +2 Dec
+lecturer: [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2], // 15 shares/yr: +2 Jan, +1 Feb–Oct, +2 Nov–Dec
 gm: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2], // 19 shares/yr: +1 Jan–May, +2 Jun–Dec
 "part-timer": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] // no accrual
 };
@@ -432,8 +432,8 @@ gm: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2], // 19 shares/yr: +1 Jan–May, +2 Jun�
 // Leave Balance for the current year. Keep this in sync with
 // ANNUAL_ACCRUAL_SHAPES if the schedule ever changes.
 const ANNUAL_ACCRUAL_HINTS = {
-admin: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–Oct), 2 days on the 1st of each month (Nov–Dec).",
-lecturer: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–Sep), 2 days on the 1st of each month (Oct–Dec).",
+admin: "Annual leave accrues monthly: 2 days on 1 Jan, 1 day on the 1st of each month (Feb–Nov), 2 days on 1 Dec.",
+lecturer: "Annual leave accrues monthly: 2 days on 1 Jan, 1 day on the 1st of each month (Feb–Oct), 2 days on the 1st of each month (Nov–Dec).",
 gm: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–May), 2 days on the 1st of each month (Jun–Dec).",
 "part-timer": "No annual leave accrual applies — this form is used for record purposes only."
 };
