@@ -10,6 +10,21 @@
 // as of ..." rows (skipped — these are running totals, not entries),
 // and the actual leave-entry rows in between.
 //
+// Column B (the date/description cell) accepts any of these, so staff can
+// keep whatever style their own tracking sheet already uses:
+// - A real Excel date cell with no text at all (just the date value) —
+// shown in the preview as "Leave (D Month YYYY)".
+// - Free text with the date (or date range) embedded, in any of: "D Month
+// YYYY", "Month D, YYYY", "DD-MM-YYYY", "DD/MM/YYYY", "YYYY-MM-DD", a
+// range joined by "-", "to", "until" or "&" between two such dates, or
+// "D-D Month YYYY" for a same-month range — with or without a leading
+// label like "Leave (...)" or "MC (...)".
+// - Anything else that still looks date-shaped (contains a 4-digit year)
+// falls back to the browser's own date parser as a last resort.
+// A row whose date genuinely can't be determined still appears in the
+// preview with a blank, red-bordered date field for the admin to fill in
+// by hand — it is never silently dropped.
+//
 // Everything happens client-side (via SheetJS) and the parsed entries are
 // only written to the ledger once the admin reviews the preview and clicks
 // "Import Checked Rows".
@@ -64,21 +79,52 @@ function pad(n) { return String(n).padStart(2, "0"); }
 function iso(y, m, d) { return y + "-" + pad(m) + "-" + pad(d); }
 function monthNum(name) { return MONTHS[String(name).trim().toLowerCase()] || null; }
 
+// Converts a real Excel date serial number (the 1899-12-30 epoch) to a JS
+// Date. Guards against small numbers (day counts, leave totals, etc.) being
+// mistaken for dates — real calendar dates in this tracker are all comfortably
+// above 20000 (year ~1954).
+function excelSerialToDate(serial) {
+if (typeof serial !== "number" || !isFinite(serial) || serial < 20000) return null;
+const ms = Math.round((serial - 25569) * 86400 * 1000);
+const d = new Date(ms);
+return isNaN(d.getTime()) ? null : d;
+}
+
+// Timezone-safe Date -> "YYYY-MM-DD". SheetJS builds date cells at UTC
+// midnight, so local getters can shift the day by one depending on the
+// browser's timezone — always read back with the UTC getters.
+function dateToISO(d) {
+return iso(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+"July", "August", "September", "October", "November", "December"];
+function formatDisplayDate(d) {
+return d.getUTCDate() + " " + MONTH_NAMES[d.getUTCMonth()] + " " + d.getUTCFullYear();
+}
+
 // Pulls a date (or date range) out of a free-text description. Tries the
-// patterns actually seen in the tracking sheet, in order of specificity.
+// patterns actually seen in the tracking sheet, from most to least specific,
+// then falls back to the browser's own date parser for anything else that
+// still looks date-shaped. Returns { start: "", end: "" } only when nothing
+// at all could be made of the text, so the preview row still shows up with
+// a blank, editable date for manual fixing.
 function parseDateFromDescription(desc, fallbackYear) {
 const m = desc.match(/\(([^)]+)\)\s*$/);
 const inner = m ? m[1].trim() : desc.trim();
 
 let mm;
 
-// "29-08-2026 until 31-08-2026"
-mm = inner.match(/(\d{1,2})-(\d{1,2})-(\d{4})\s+until\s+(\d{1,2})-(\d{1,2})-(\d{4})/i);
+// "29-08-2026 until 31-08-2026" / "29-08-2026 to 31-08-2026" / "29-08-2026 - 31-08-2026" / "17-08-2026 & 18-08-2026"
+mm = inner.match(/(\d{1,2})-(\d{1,2})-(\d{4})\s*(?:-|until|to|&)\s*(\d{1,2})-(\d{1,2})-(\d{4})/i);
 if (mm) return { start: iso(mm[3], mm[2], mm[1]), end: iso(mm[6], mm[5], mm[4]) };
 
-// "17-08-2026 & 18-08-2026"
-mm = inner.match(/(\d{1,2})-(\d{1,2})-(\d{4})\s*&\s*(\d{1,2})-(\d{1,2})-(\d{4})/);
-if (mm) return { start: iso(mm[3], mm[2], mm[1]), end: iso(mm[6], mm[5], mm[4]) };
+// "5 June 2026 - 6 June 2026" / "5 June 2026 to 6 June 2026" / "...until..." / "...&..."
+mm = inner.match(/(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})\s*(?:-|to|until|&)\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})/i);
+if (mm) {
+const mo1 = monthNum(mm[2]), mo2 = monthNum(mm[5]);
+if (mo1 && mo2) return { start: iso(mm[3], mo1, mm[1]), end: iso(mm[6], mo2, mm[4]) };
+}
 
 // "12-14 March 2026" / "11-12 Sept 2026"
 mm = inner.match(/(\d{1,2})\s*-\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
@@ -87,16 +133,54 @@ const mo = monthNum(mm[3]);
 if (mo) return { start: iso(mm[4], mo, mm[1]), end: iso(mm[4], mo, mm[2]) };
 }
 
-// "7th February 2026" / "16-09-2026" style single ordinal date
+// "7th February 2026" / single ordinal date, day before month
 mm = inner.match(/(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})/);
 if (mm) {
 const mo = monthNum(mm[2]);
 if (mo) { const d = iso(mm[3], mo, mm[1]); return { start: d, end: d }; }
 }
 
+// "June 5, 2026 - June 6, 2026" / "Feb 7 2026 to Feb 9 2026" — month-first range
+mm = inner.match(/([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\s*(?:-|to|until|&)\s*([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/i);
+if (mm) {
+const mo1 = monthNum(mm[1]), mo2 = monthNum(mm[4]);
+if (mo1 && mo2) return { start: iso(mm[3], mo1, mm[2]), end: iso(mm[6], mo2, mm[5]) };
+}
+
+// "February 7, 2026" / "Feb 7 2026" — month name first, single date
+mm = inner.match(/([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/);
+if (mm) {
+const mo = monthNum(mm[1]);
+if (mo) { const d = iso(mm[3], mo, mm[2]); return { start: d, end: d }; }
+}
+
+// ISO "2026-06-05 to 2026-06-06" / "2026-06-05"
+mm = inner.match(/(\d{4})-(\d{1,2})-(\d{1,2})\s*(?:-|to|until|&)\s*(\d{4})-(\d{1,2})-(\d{1,2})/i);
+if (mm) return { start: iso(mm[1], mm[2], mm[3]), end: iso(mm[4], mm[5], mm[6]) };
+mm = inner.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+if (mm) { const d = iso(mm[1], mm[2], mm[3]); return { start: d, end: d }; }
+
 // "19-05-2026" single dd-mm-yyyy
 mm = inner.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
 if (mm) { const d = iso(mm[3], mm[2], mm[1]); return { start: d, end: d }; }
+
+// "19/05/2026 - 21/05/2026" / "19/05/2026" slash dates (dd/mm/yyyy)
+mm = inner.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(?:-|to|until|&)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+if (mm) return { start: iso(mm[3], mm[2], mm[1]), end: iso(mm[6], mm[5], mm[4]) };
+mm = inner.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+if (mm) { const d = iso(mm[3], mm[2], mm[1]); return { start: d, end: d }; }
+
+// Last resort: let the browser's own date parser take a shot — catches odd
+// but valid styles not covered above (e.g. "5 Jun, 2026", "06/05/2026 (Fri)").
+// Only trusted when the text actually contains a 4-digit year, so a stray
+// number in the description is never mistaken for a date.
+if (/\d{4}/.test(inner)) {
+const native = new Date(inner);
+if (!isNaN(native.getTime())) {
+const d = dateToISO(native);
+return { start: d, end: d };
+}
+}
 
 return { start: "", end: "" };
 }
@@ -115,7 +199,11 @@ const file = fileInput.files[0];
 if (!file) return;
 try {
 const buf = await file.arrayBuffer();
-workbook = XLSX.read(buf, { type: "array" });
+// cellDates: true makes SheetJS hand back real Excel date cells as JS Date
+// objects instead of raw numeric serials, so a sheet that stores the leave
+// date as an actual date cell (not typed into the description) parses
+// correctly below instead of being silently skipped.
+workbook = XLSX.read(buf, { type: "array", cellDates: true });
 
 sheetSelect.innerHTML = "";
 workbook.SheetNames.forEach(function (name) {
@@ -179,15 +267,38 @@ sickEntitlement: Number((rows[2] || [])[3]) || 0
 
 for (let i = 3; i < rows.length; i++) {
 const row = rows[i] || [];
-const desc = row[1];
-if (!desc || typeof desc !== "string") continue;
-const trimmed = desc.trim();
+const raw = row[1];
+if (raw === null || raw === undefined || raw === "") continue;
+
+let trimmed, dates;
+
+if (raw instanceof Date) {
+// A real Excel date cell with no description text alongside it — the
+// case that used to be silently dropped. cellDates:true (above) gives
+// us this as a proper Date.
+const d = dateToISO(raw);
+dates = { start: d, end: d };
+trimmed = "Leave (" + formatDisplayDate(raw) + ")";
+} else if (typeof raw === "number") {
+// Some spreadsheets (or a raw:true re-read) can still hand back a bare
+// Excel date serial instead of a Date object — recover it the same way.
+const asDate = excelSerialToDate(raw);
+if (!asDate) continue;
+const d = dateToISO(asDate);
+dates = { start: d, end: d };
+trimmed = "Leave (" + formatDisplayDate(asDate) + ")";
+} else if (typeof raw === "string") {
+trimmed = raw.trim();
 if (!trimmed) continue;
 if (/^annual leave balance as of/i.test(trimmed)) continue;
 // Month header rows are just a month name + 4-digit year, nothing else on the row.
 const isMonthHeader = /^[A-Za-z]+\s+\d{4}$/.test(trimmed) &&
 !row[2] && !row[3] && !row[4] && !row[5];
 if (isMonthHeader) continue;
+dates = parseDateFromDescription(trimmed, year);
+} else {
+continue;
+}
 
 const annual = Number(row[2]) || 0;
 const sick = Number(row[3]) || 0;
@@ -195,7 +306,6 @@ const unpaid = Number(row[4]) || 0;
 const hosp = Number(row[5]) || 0;
 if (!annual && !sick && !unpaid && !hosp) continue;
 
-const dates = parseDateFromDescription(trimmed, year);
 previewRows.push({
 include: true,
 start: dates.start,
