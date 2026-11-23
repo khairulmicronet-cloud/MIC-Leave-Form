@@ -10,10 +10,10 @@
 //
 // Running balances are computed here in the browser. Sick balance is a
 // flat pool (carry-forward + entitlement − used). Annual balance accrues
-// monthly instead of being available in full on 1 January, on a schedule
-// that varies by role (Admin, Lecturer, GM, part-timer) — see
-// ANNUAL_ACCRUAL_SHAPES below for the exact per-month release for each
-// role. A configured entitlement scales every release proportionally
+// in dated releases instead of being available in full on 1 January, on
+// a schedule that varies by role (Admin, Lecturer, GM, part-timer) — see
+// ANNUAL_ACCRUAL_EVENTS below for the exact release dates/amounts for
+// each role. A configured entitlement scales every release proportionally
 // (see accruedAnnual() below). Unpaid/Hospitalize have no entitlement,
 // they're just running totals.
 //
@@ -412,28 +412,42 @@ return e.Staff === staff && (e.StartDate || "").slice(0, 4) === String(year);
 .sort(function (a, b) { return (a.StartDate || "").localeCompare(b.StartDate || ""); });
 }
 
-// Per-role monthly release shape: how many "shares" of the Annual Leave
-// entitlement release on the 1st of each month (index 0 = Jan … 11 =
-// Dec). The shape's total is the number of shares a full-year
-// entitlement is divided into for that role — e.g. an Admin's
-// configured entitlement releases across 14 shares, a Lecturer's across
-// 15, matching how Micronet actually paces each role's leave through
-// the year (roles were confirmed with Maziyah, Sept 2026). A
-// part-timer has no accrual at all — the form is used purely as a
-// formality for them.
-const ANNUAL_ACCRUAL_SHAPES = {
-admin: [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], // 14 shares/yr: +2 Jan, +1 Feb–Nov, +2 Dec
-lecturer: [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2], // 15 shares/yr: +2 Jan, +1 Feb–Oct, +2 Nov–Dec
-gm: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2], // 19 shares/yr: +1 Jan–May, +2 Jun–Dec
-"part-timer": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] // no accrual
+// Turns a flat "one release on the 1st of each month" array (index 0 =
+// Jan … 11 = Dec) into the { month, day, shares } event list that
+// accruedAnnual() below actually reads. Used for the roles whose whole
+// schedule is still "1st of the month, every month".
+function monthlyEvents(sharesPerMonth) {
+return sharesPerMonth.map(function (shares, month) { return { month: month, day: 1, shares: shares }; });
+}
+
+// Per-role release schedule: how many "shares" of the Annual Leave
+// entitlement release, and on which exact date. The schedule's total is
+// the number of shares a full-year entitlement is divided into for that
+// role — e.g. an Admin's configured entitlement releases across 14
+// shares, a Lecturer's across 15, matching how Micronet actually paces
+// each role's leave through the year (roles reconfirmed Nov 2026: Jan–Oct
+// release 1 share on the 1st of the month for everyone; November's share
+// is role-dependent; December splits into 2 shares on 1 Dec plus 1 more
+// held back to 31 Dec). A part-timer has no accrual at all — the form is
+// used purely as a formality for them.
+const ANNUAL_ACCRUAL_EVENTS = {
+// Jan–Oct: +1 on the 1st of each month. Nov: +1. Dec: +2 on the 1st,
+// +1 more on the 31st. Total = 10 + 1 + 2 + 1 = 14 shares/yr.
+admin: monthlyEvents([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2]).concat([{ month: 11, day: 31, shares: 1 }]),
+// Jan–Oct: +1 on the 1st of each month. Nov: +2. Dec: +2 on the 1st,
+// +1 more on the 31st. Total = 10 + 2 + 2 + 1 = 15 shares/yr.
+lecturer: monthlyEvents([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2]).concat([{ month: 11, day: 31, shares: 1 }]),
+// Unchanged: +1 Jan–May, +2 Jun–Dec, all on the 1st. 19 shares/yr.
+gm: monthlyEvents([1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2]),
+"part-timer": [] // no accrual
 };
 
-// Human-readable version of each shape above, shown under the Annual
+// Human-readable version of each schedule above, shown under the Annual
 // Leave Balance for the current year. Keep this in sync with
-// ANNUAL_ACCRUAL_SHAPES if the schedule ever changes.
+// ANNUAL_ACCRUAL_EVENTS if the schedule ever changes.
 const ANNUAL_ACCRUAL_HINTS = {
-admin: "Annual leave accrues monthly: 2 days on 1 Jan, 1 day on the 1st of each month (Feb–Nov), 2 days on 1 Dec.",
-lecturer: "Annual leave accrues monthly: 2 days on 1 Jan, 1 day on the 1st of each month (Feb–Oct), 2 days on the 1st of each month (Nov–Dec).",
+admin: "Annual leave accrues in stages: 1 day on the 1st of each month (Jan–Nov), 2 days on 1 Dec, and a final 1 day on 31 Dec.",
+lecturer: "Annual leave accrues in stages: 1 day on the 1st of each month (Jan–Oct), 2 days on 1 Nov, 2 days on 1 Dec, and a final 1 day on 31 Dec.",
 gm: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–May), 2 days on the 1st of each month (Jun–Dec).",
 "part-timer": "No annual leave accrual applies — this form is used for record purposes only."
 };
@@ -451,11 +465,12 @@ return (entry && entry.role) || "lecturer";
 // been released as of `asOf`, for the given `year`:
 //   - a year already in the past is fully accrued (the whole entitlement)
 //   - a year not yet started hasn't accrued anything
-//   - the current year accrues progressively, released on the 1st of
-//     each month according to that staff's role-based shape above. A
+//   - the current year accrues progressively, released on the exact
+//     dates in that staff's role-based event list above (ANNUAL_
+//     ACCRUAL_EVENTS) — every event whose date has passed counts. A
 //     configured entitlement scales every share proportionally, e.g. an
 //     Admin's 12-day entitlement releases 12/14 of a share at each of
-//     the 14 release points in their shape.
+//     the 14 release points in their schedule.
 function accruedAnnual(entitlement, year, asOf, role) {
 const e = Number(entitlement) || 0;
 const y = Number(year);
@@ -463,14 +478,18 @@ const currentYear = asOf.getFullYear();
 if (y < currentYear) return e;
 if (y > currentYear) return 0;
 
-const shape = ANNUAL_ACCRUAL_SHAPES[role] || ANNUAL_ACCRUAL_SHAPES.lecturer;
-const totalShares = shape.reduce(function (a, b) { return a + b; }, 0);
+const events = ANNUAL_ACCRUAL_EVENTS[role] || ANNUAL_ACCRUAL_EVENTS.lecturer;
+const totalShares = events.reduce(function (a, ev) { return a + ev.shares; }, 0);
 if (totalShares === 0) return 0;
 const sharesPerDay = e / totalShares;
 
-const month = asOf.getMonth(); // 0 = Jan … 11 = Dec
+// y is the year being asked about, which only reaches here when it
+// equals asOf's year (handled above), so every event date is built in
+// that same year and compared directly against asOf.
 let shares = 0;
-for (let m = 0; m <= month; m++) shares += shape[m];
+events.forEach(function (ev) {
+if (new Date(y, ev.month, ev.day) <= asOf) shares += ev.shares;
+});
 
 // Round to the nearest half-day for a clean display; exact for a
 // role's default entitlement (14/15/19), a close approximation for any
