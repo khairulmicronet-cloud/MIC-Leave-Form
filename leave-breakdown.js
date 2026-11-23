@@ -443,12 +443,18 @@ gm: monthlyEvents([1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2]),
 };
 
 // Human-readable version of each schedule above, shown under the Annual
-// Leave Balance for the current year. Keep this in sync with
+// Leave Balance for the current year. Described in terms of "shares"
+// rather than literal day counts, because a staff member's configured
+// AnnualEntitlement can differ from the role's standard total (e.g. a
+// GM on 21 days instead of the usual 19, or a reduced entitlement like
+// Nurzahidah's 8) — accruedAnnual() scales every share proportionally
+// to whatever entitlement is actually configured, so the wording here
+// must not imply 1 share always equals 1 day. Keep this in sync with
 // ANNUAL_ACCRUAL_EVENTS if the schedule ever changes.
 const ANNUAL_ACCRUAL_HINTS = {
-admin: "Annual leave accrues in stages: 1 day on the 1st of each month (Jan–Nov), 2 days on 1 Dec, and a final 1 day on 31 Dec.",
-lecturer: "Annual leave accrues in stages: 1 day on the 1st of each month (Jan–Oct), 2 days on 1 Nov, 2 days on 1 Dec, and a final 1 day on 31 Dec.",
-gm: "Annual leave accrues monthly: 1 day on the 1st of each month (Jan–May), 2 days on the 1st of each month (Jun–Dec).",
+admin: "Annual leave accrues in stages, in proportion to your configured entitlement: 1 share releases on the 1st of each month (Jan–Nov), 2 shares on 1 Dec, and a final share on 31 Dec (14 shares across the year).",
+lecturer: "Annual leave accrues in stages, in proportion to your configured entitlement: 1 share releases on the 1st of each month (Jan–Oct), 2 shares on 1 Nov, 2 shares on 1 Dec, and a final share on 31 Dec (15 shares across the year).",
+gm: "Annual leave accrues in stages, in proportion to your configured entitlement: 1 share releases on the 1st of each month (Jan–May), 2 shares on the 1st of each month (Jun–Dec) (19 shares across the year).",
 "part-timer": "No annual leave accrual applies — this form is used for record purposes only."
 };
 
